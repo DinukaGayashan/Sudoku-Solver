@@ -324,14 +324,41 @@ def extract_sudoku(image_path):
     final_image = parse_grid(image_path)
     return final_image
 
+def split_image(image, num_rows, num_cols):
+    height, width = image.shape[:2]
+
+    square_height = height // num_rows
+    square_width = width // num_cols
+
+    for i in range(num_rows):
+        for j in range(num_cols):
+            y1 = i * square_height
+            y2 = (i + 1) * square_height
+            x1 = j * square_width
+            x2 = (j + 1) * square_width
+            square_part = image[y1:y2, x1:x2]
+            custom_config = r'--psm 10 --oem 3 -c tessedit_char_whitelist=0123456789'
+            txt = pytesseract.image_to_string(square_part,config=custom_config)
+            print(txt, end="")
+
+        print("") 
+
 if __name__ == '__main__':
+    puzzle_size=9
     image_path = 'recogniser\sudoku.jpg'
     image = extract_sudoku(image_path)
-    # split_image(image,9,9)
-    cv2.imwrite('recogniser\puzzle.jpg', image)
-    # pytesseract_cmd=r'C:\Users\dinuk\AppData\Local\Programs\Tesseract-OCR'
 
-    show_image(image)
+    split_image(image,9,9)
+    cv2.imwrite('recogniser\puzzle.jpg', image)
+
+    custom_config = r'--psm 10 --oem 3 -c tessedit_char_whitelist=0123456789'
+    txt = pytesseract.image_to_string(image,config=custom_config)
+    print(txt)
+
+    # show_image(image)
+    # img=cv2.imread('recogniser/txt.jpg')
+    # txt = pytesseract.image_to_string(img)
+    # print(txt)
     # grid = extract_number(image)
     # print('Sudoku:')
     # display_sudoku(grid.tolist())
