@@ -6,45 +6,6 @@ import pytesseract
 from matplotlib import pyplot as plt
 
 
-def is_valid_sudoku(board,size) -> bool:
-        sqrt=int(size**0.5)
-        rows = [set() for _ in range(size)]
-        cols = [set() for _ in range(size)]
-        block = [[set() for _ in range(sqrt)] for _ in range(sqrt)]
-
-        for i in range(size):
-            for j in range(size):
-                curr = board[i][j]
-                if curr == 0:
-                    continue
-                if (curr in rows[i]) or (curr in cols[j]) or (curr in block[i // sqrt][j // sqrt]):
-                    return False
-                rows[i].add(curr)
-                cols[j].add(curr)
-                block[i // sqrt][j // sqrt].add(curr)
-        return True
-
-
-def plot_many_images(images, titles, rows=1, columns=2):
-    """Plots each image in a given list as a grid structure. using Matplotlib."""
-    for i, image in enumerate(images):
-        plt.subplot(rows, columns, i+1)
-        plt.imshow(image, 'gray')
-        plt.title(titles[i])
-        plt.xticks([]), plt.yticks([])  # Hide tick marks
-    plt.show()
-
-
-def show_image(img):
-    """Shows an image until any key is pressed"""
-#    print(type(img))
-#    print(img.shape)
-#    cv2.imshow('image', img)  # Display the image
-#    cv2.imwrite('images/gau_sudoku3.jpg', img)
-#    cv2.waitKey(0)  # Wait for any key to be pressed (with the image window active)
-#    cv2.destroyAllWindows()  # Close all windows
-    return img
-
 
 def show_digits(digits, colour=255):
     """Shows list of 81 extracted digits in a grid format"""
@@ -53,7 +14,7 @@ def show_digits(digits, colour=255):
     for i in range(9):
         row = np.concatenate(with_border[i * 9:((i + 1) * 9)], axis=1)
         rows.append(row)
-    img = show_image(np.concatenate(rows))
+    img = np.concatenate(rows)
     return img
  
 
@@ -66,38 +27,6 @@ def convert_when_colour(colour, img):
             img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
     return img
 
-
-def display_points(in_img, points, radius=5, colour=(0, 0, 255)):
-    """Draws circular points on an image."""
-    img = in_img.copy()
-
-    # Dynamically change to a colour image if necessary
-    if len(colour) == 3:
-        if len(img.shape) == 2:
-            img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
-        elif img.shape[2] == 1:
-            img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
-
-    for point in points:
-        img = cv2.circle(img, tuple(int(x) for x in point), radius, colour, -1)
-    show_image(img)
-    return img
-
-
-def display_rects(in_img, rects, colour=(0, 0, 255)):
-    """Displays rectangles on the image."""
-    img = convert_when_colour(colour, in_img.copy())
-    for rect in rects:
-        img = cv2.rectangle(img, tuple(int(x) for x in rect[0]), tuple(int(x) for x in rect[1]), colour)
-    show_image(img)
-    return img
-
-
-def display_contours(in_img, contours, colour=(0, 0, 255), thickness=2):
-    """Displays contours on the image."""
-    img = convert_when_colour(colour, in_img.copy())
-    img = cv2.drawContours(img, contours, -1, colour, thickness)
-    show_image(img)
 
 
 def pre_process_image(img, skip_dilate=False):
@@ -317,30 +246,17 @@ def get_digits(img, squares, size):
     return digits
 
 
-def parse_grid(path):
+def process_image(path,puzzle_size):
     original = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
     processed = pre_process_image(original)
-        
-#    cv2.namedWindow('processed',cv2.WINDOW_AUTOSIZE)
-#    processed_img = cv2.resize(processed, (500, 500))          # Resize image
-#    cv2.imshow('processed', processed_img)
         
     corners = find_corners_of_largest_polygon(processed)
     cropped = crop_and_warp(original, corners)
         
-#    cv2.namedWindow('cropped',cv2.WINDOW_AUTOSIZE)
-#    cropped_img = cv2.resize(cropped, (500, 500))              # Resize image
-#    cv2.imshow('cropped', cropped_img)
-        
     squares = infer_grid(cropped)
-#    print(squares)
     digits = get_digits(cropped, squares, 28)
-#    print(digits)
-    final_image = show_digits(digits)
-    return final_image
 
-def extract_sudoku(image_path):
-    final_image = parse_grid(image_path)
+    final_image = show_digits(digits)
     return final_image
 
 
@@ -350,7 +266,9 @@ def extract_number(image_part):
     return txt
 
 
-def get_puzzle(image, num_rows, num_cols):
+def get_puzzle(image, puzzle_size):
+    num_rows=puzzle_size
+    num_cols=puzzle_size
     height, width = image.shape[:2]
 
     square_height = height // num_rows
@@ -375,16 +293,37 @@ def get_puzzle(image, num_rows, num_cols):
     return puzzle
 
 
+def is_valid_sudoku(board,size) -> bool:
+        sqrt=int(size**0.5)
+        rows = [set() for _ in range(size)]
+        cols = [set() for _ in range(size)]
+        block = [[set() for _ in range(sqrt)] for _ in range(sqrt)]
+
+        for i in range(size):
+            for j in range(size):
+                curr = board[i][j]
+                if curr == 0:
+                    continue
+                if (curr in rows[i]) or (curr in cols[j]) or (curr in block[i // sqrt][j // sqrt]):
+                    return False
+                rows[i].add(curr)
+                cols[j].add(curr)
+                block[i // sqrt][j // sqrt].add(curr)
+        return True
 
 
 if __name__ == '__main__':
     puzzle_size=9
-    image_path = 'recogniser\sudoku.jpg'
-    image = extract_sudoku(image_path)
+    image_path = 'files\sudoku.jpg'
+    processed_image = process_image(image_path,puzzle_size)
+    cv2.imwrite('files\puzzle.jpg', processed_image)
 
-    puzzle=get_puzzle(image,9,9)
-    print(puzzle)
+    puzzle=get_puzzle(processed_image,puzzle_size)
+    for row in puzzle:
+        print(row)
     print(is_valid_sudoku(puzzle,puzzle_size))
+
+
 
     # cv2.imwrite('recogniser\puzzle.jpg', image)
 
