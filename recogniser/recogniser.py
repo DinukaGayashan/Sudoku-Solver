@@ -29,12 +29,12 @@ def convert_when_colour(colour, img):
 
 
 
-def pre_process_image(img, skip_dilate=False):
+def pre_process_image(img,puzzle_size, skip_dilate=False):
     """Uses a blurring function, adaptive thresholding and dilation to expose the main features of an image."""
 
     # Gaussian blur with a kernal size (height, width) of 9.
     # Note that kernal sizes must be positive and odd and the kernel must be square.
-    proc = cv2.GaussianBlur(img.copy(), (9, 9), 0)
+    proc = cv2.GaussianBlur(img.copy(), (puzzle_size, puzzle_size), 0)
 
     # Adaptive threshold using 11 nearest neighbour pixels
     proc = cv2.adaptiveThreshold(proc, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
@@ -112,15 +112,15 @@ def crop_and_warp(img, crop_rect):
     return cv2.warpPerspective(img, m, (int(side), int(side)))
 
 
-def infer_grid(img):
+def infer_grid(img,puzzle_size):
     """Infers 81 cell grid from a square image."""
     squares = []
     side = img.shape[:1]
-    side = side[0] / 9
+    side = side[0] / puzzle_size
 
     # Note that we swap j and i here so the rectangles are stored in the list reading left-right instead of top-down.
-    for j in range(9):
-        for i in range(9):
+    for j in range(puzzle_size):
+        for i in range(puzzle_size):
             p1 = (i * side, j * side)  # Top left corner of a bounding box
             p2 = ((i + 1) * side, (j + 1) * side)  # Bottom right corner of bounding box
             squares.append((p1, p2))
@@ -231,30 +231,30 @@ def extract_digit(img, rect, size):
 
     # Ignore any small bounding boxes
     if w > 0 and h > 0 and (w * h) > 100 and len(digit) > 0:
-        return scale_and_centre(digit, size, 4)
+        return scale_and_centre(digit, size, 10)
     else:
         return np.zeros((size, size), np.uint8)
 
 
-def get_digits(img, squares, size):
+def get_digits(img, squares,puzzle_size, size):
     """Extracts digits from their cells and builds an array"""
     digits = []
-    img = pre_process_image(img.copy(), skip_dilate=True)
+    img = pre_process_image(img.copy(),puzzle_size, skip_dilate=True)
 #    cv2.imshow('img', img)
     for square in squares:
         digits.append(extract_digit(img, square, size))
     return digits
 
 
-def process_image(path,puzzle_size):
+def process_image(path, puzzle_size):
     original = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
-    processed = pre_process_image(original)
+    processed = pre_process_image(original,puzzle_size)
         
     corners = find_corners_of_largest_polygon(processed)
     cropped = crop_and_warp(original, corners)
         
-    squares = infer_grid(cropped)
-    digits = get_digits(cropped, squares, 28)
+    squares = infer_grid(cropped,puzzle_size)
+    digits = get_digits(cropped, squares,puzzle_size, 36)
 
     final_image = show_digits(digits)
     return final_image
@@ -262,6 +262,8 @@ def process_image(path,puzzle_size):
 
 def extract_number(image_part):
     custom_config = r'--psm 10 --oem 3 -c tessedit_char_whitelist=0123456789'
+    # custom_config = r'--psm 6 --oem 3 -c tessedit_char_whitelist=0123456789 -l eng'
+    # custom_config = r'--psm 10 --oem 3 -l eng'
     txt = pytesseract.image_to_string(image_part,config=custom_config)
     return txt
 
@@ -314,7 +316,7 @@ def is_valid_sudoku(board,size) -> bool:
 
 if __name__ == '__main__':
     puzzle_size=9
-    image_path = 'files\sudoku.jpg'
+    image_path = 'files\sudoku2.jpg'
     processed_image = process_image(image_path,puzzle_size)
     cv2.imwrite('files\puzzle.jpg', processed_image)
 
