@@ -6,6 +6,25 @@ import pytesseract
 from matplotlib import pyplot as plt
 
 
+def is_valid_sudoku(board,size) -> bool:
+        sqrt=int(size**0.5)
+        rows = [set() for _ in range(size)]
+        cols = [set() for _ in range(size)]
+        block = [[set() for _ in range(sqrt)] for _ in range(sqrt)]
+
+        for i in range(size):
+            for j in range(size):
+                curr = board[i][j]
+                if curr == 0:
+                    continue
+                if (curr in rows[i]) or (curr in cols[j]) or (curr in block[i // sqrt][j // sqrt]):
+                    return False
+                rows[i].add(curr)
+                cols[j].add(curr)
+                block[i // sqrt][j // sqrt].add(curr)
+        return True
+
+
 def plot_many_images(images, titles, rows=1, columns=2):
     """Plots each image in a given list as a grid structure. using Matplotlib."""
     for i, image in enumerate(images):
@@ -324,36 +343,65 @@ def extract_sudoku(image_path):
     final_image = parse_grid(image_path)
     return final_image
 
-def split_image(image, num_rows, num_cols):
+
+def extract_number(image_part):
+    custom_config = r'--psm 10 --oem 3 -c tessedit_char_whitelist=0123456789'
+    txt = pytesseract.image_to_string(image_part,config=custom_config)
+    return txt
+
+
+def get_puzzle(image, num_rows, num_cols):
     height, width = image.shape[:2]
 
     square_height = height // num_rows
     square_width = width // num_cols
 
+    puzzle = []
+
     for i in range(num_rows):
+        row = []  # Initialize a new row for each iteration
         for j in range(num_cols):
             y1 = i * square_height
             y2 = (i + 1) * square_height
             x1 = j * square_width
             x2 = (j + 1) * square_width
             square_part = image[y1:y2, x1:x2]
-            custom_config = r'--psm 10 --oem 3 -c tessedit_char_whitelist=0123456789'
-            txt = pytesseract.image_to_string(square_part,config=custom_config)
-            print(txt, end="")
+            s=extract_number(square_part)
+            s='0' if s == '' else s
+            number = int(s.strip())
+            row.append(0 if number is None else number)
+        puzzle.append(row)
 
-        print("") 
+    return puzzle
+
+
+
 
 if __name__ == '__main__':
     puzzle_size=9
     image_path = 'recogniser\sudoku.jpg'
     image = extract_sudoku(image_path)
 
-    split_image(image,9,9)
-    cv2.imwrite('recogniser\puzzle.jpg', image)
+    puzzle=get_puzzle(image,9,9)
+    print(puzzle)
+    print(is_valid_sudoku(puzzle,puzzle_size))
 
-    custom_config = r'--psm 10 --oem 3 -c tessedit_char_whitelist=0123456789'
-    txt = pytesseract.image_to_string(image,config=custom_config)
-    print(txt)
+    # cv2.imwrite('recogniser\puzzle.jpg', image)
+
+    # custom_config = r'--psm 10 --oem 3 -c tessedit_char_whitelist=0123456789'
+    # txt = pytesseract.image_to_string(image,config=custom_config)
+    # print(txt)
+
+    # Convert recognized text to a 2D array
+    # puzzle = []
+    # for i in range(puzzle_size):
+    #     row = [int(c) if c.isdigit() else 0 for c in txt[i * puzzle_size:(i + 1) * puzzle_size]]
+    #     puzzle.append(row)
+
+    # # Print the 2D array
+    # for row in puzzle:
+    #     print(row)
+
 
     # show_image(image)
     # img=cv2.imread('recogniser/txt.jpg')
