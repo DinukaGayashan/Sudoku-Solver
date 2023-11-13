@@ -7,34 +7,34 @@ from matplotlib import pyplot as plt
 
 
 
-def show_digits(digits, colour=255):
+def show_digits(digits,puzzle_size, colour=255):
     """Shows list of 81 extracted digits in a grid format"""
     rows = []
     with_border = [cv2.copyMakeBorder(img.copy(), 1, 1, 1, 1, cv2.BORDER_CONSTANT, None, colour) for img in digits]
-    for i in range(9):
-        row = np.concatenate(with_border[i * 9:((i + 1) * 9)], axis=1)
+    for i in range(puzzle_size):
+        row = np.concatenate(with_border[i * puzzle_size:((i + 1) * puzzle_size)], axis=1)
         rows.append(row)
     img = np.concatenate(rows)
     return img
  
 
-def convert_when_colour(colour, img):
-    """Dynamically converts an image to colour if the input colour is a tuple and the image is grayscale."""
-    if len(colour) == 3:
-        if len(img.shape) == 2:
-            img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
-        elif img.shape[2] == 1:
-            img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
-    return img
+# def convert_when_colour(colour, img):
+#     """Dynamically converts an image to colour if the input colour is a tuple and the image is grayscale."""
+#     if len(colour) == 3:
+#         if len(img.shape) == 2:
+#             img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+#         elif img.shape[2] == 1:
+#             img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+#     return img
 
 
 
-def pre_process_image(img,puzzle_size, skip_dilate=False):
+def pre_process_image(img, skip_dilate=False):
     """Uses a blurring function, adaptive thresholding and dilation to expose the main features of an image."""
 
     # Gaussian blur with a kernal size (height, width) of 9.
     # Note that kernal sizes must be positive and odd and the kernel must be square.
-    proc = cv2.GaussianBlur(img.copy(), (puzzle_size, puzzle_size), 0)
+    proc = cv2.GaussianBlur(img.copy(), (9, 9), 0)
 
     # Adaptive threshold using 11 nearest neighbour pixels
     proc = cv2.adaptiveThreshold(proc, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
@@ -78,15 +78,15 @@ def find_corners_of_largest_polygon(img):
     return [polygon[top_left][0], polygon[top_right][0], polygon[bottom_right][0], polygon[bottom_left][0]]
 
 
-def distance_between(p1, p2):
-    """Returns the scalar distance between two points"""
-    a = p2[0] - p1[0]
-    b = p2[1] - p1[1]
-    return np.sqrt((a ** 2) + (b ** 2))
-
 
 def crop_and_warp(img, crop_rect):
     """Crops and warps a rectangular section from an image into a square of similar size."""
+
+    def distance_between(p1, p2):
+        """Returns the scalar distance between two points"""
+        a = p2[0] - p1[0]
+        b = p2[1] - p1[1]
+        return np.sqrt((a ** 2) + (b ** 2))
 
     # Rectangle described by top left, top right, bottom right and bottom left points
     top_left, top_right, bottom_right, bottom_left = crop_rect[0], crop_rect[1], crop_rect[2], crop_rect[3]
@@ -231,15 +231,15 @@ def extract_digit(img, rect, size):
 
     # Ignore any small bounding boxes
     if w > 0 and h > 0 and (w * h) > 100 and len(digit) > 0:
-        return scale_and_centre(digit, size, 10)
+        return scale_and_centre(digit, size, 7)
     else:
         return np.zeros((size, size), np.uint8)
 
 
-def get_digits(img, squares,puzzle_size, size):
+def get_digits(img, squares, size):
     """Extracts digits from their cells and builds an array"""
     digits = []
-    img = pre_process_image(img.copy(),puzzle_size, skip_dilate=True)
+    img = pre_process_image(img.copy(), skip_dilate=True)
 #    cv2.imshow('img', img)
     for square in squares:
         digits.append(extract_digit(img, square, size))
@@ -248,15 +248,15 @@ def get_digits(img, squares,puzzle_size, size):
 
 def process_image(path, puzzle_size):
     original = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
-    processed = pre_process_image(original,puzzle_size)
+    processed = pre_process_image(original)
         
     corners = find_corners_of_largest_polygon(processed)
     cropped = crop_and_warp(original, corners)
         
     squares = infer_grid(cropped,puzzle_size)
-    digits = get_digits(cropped, squares,puzzle_size, 36)
+    digits = get_digits(cropped, squares, 36)
 
-    final_image = show_digits(digits)
+    final_image = show_digits(digits,puzzle_size)
     return final_image
 
 
@@ -296,27 +296,37 @@ def get_puzzle(image, puzzle_size):
 
 
 def is_valid_sudoku(board,size) -> bool:
-        sqrt=int(size**0.5)
-        rows = [set() for _ in range(size)]
-        cols = [set() for _ in range(size)]
-        block = [[set() for _ in range(sqrt)] for _ in range(sqrt)]
+    sqrt=int(size**0.5)
+    rows = [set() for _ in range(size)]
+    cols = [set() for _ in range(size)]
+    block = [[set() for _ in range(sqrt)] for _ in range(sqrt)]
 
-        for i in range(size):
-            for j in range(size):
-                curr = board[i][j]
-                if curr == 0:
-                    continue
-                if (curr in rows[i]) or (curr in cols[j]) or (curr in block[i // sqrt][j // sqrt]):
-                    return False
-                rows[i].add(curr)
-                cols[j].add(curr)
-                block[i // sqrt][j // sqrt].add(curr)
-        return True
+    for i in range(size):
+        for j in range(size):
+            curr = board[i][j]
+            if curr not in range(0, size+1):
+                return False
+            if curr == 0:
+                continue
+            if (curr in rows[i]) or (curr in cols[j]) or (curr in block[i // sqrt][j // sqrt]):
+                return False
+            rows[i].add(curr)
+            cols[j].add(curr)
+            block[i // sqrt][j // sqrt].add(curr)
+    return True
+
+
+def save_puzzle_to_file(puzzle,filename):
+    with open(filename, 'w') as file:
+        for row in puzzle:
+            file.write(' '.join(map(str, row)) + '\n')
+
 
 
 if __name__ == '__main__':
     puzzle_size=9
-    image_path = 'files\sudoku2.jpg'
+    image_path = 'files\sudoku.jpg'
+    puzzle_path='files\puzzle.txt'
     processed_image = process_image(image_path,puzzle_size)
     cv2.imwrite('files\puzzle.jpg', processed_image)
 
@@ -325,7 +335,7 @@ if __name__ == '__main__':
         print(row)
     print(is_valid_sudoku(puzzle,puzzle_size))
 
-
+    save_puzzle_to_file(puzzle, puzzle_path)
 
     # cv2.imwrite('recogniser\puzzle.jpg', image)
 
