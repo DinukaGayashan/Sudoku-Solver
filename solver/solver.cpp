@@ -4,54 +4,51 @@
 #include <vector>
 #include <cmath>
 
-using namespace std;
-
-
 class Sudoku
 {
 private:
     const int UNASSIGNED = 0;
-    int N;
-    int **grid;
+    int N, sqrtN;
+    std::vector<std::vector<int>> grid;
 
     bool FindUnassignedLocation(int &row, int &col)
     {
-        for (row = 0; row < N; row++)
-            for (col = 0; col < N; col++)
+        for (row = 0; row < N; ++row)
+            for (col = 0; col < N; ++col)
                 if (grid[row][col] == UNASSIGNED)
                     return true;
         return false;
     }
 
-    bool UsedInRow(int row, int num)
+    bool UsedInRow(int row, int num) const
     {
-        for (int col = 0; col < N; col++)
+        for (int col = 0; col < N; ++col)
             if (grid[row][col] == num)
                 return true;
         return false;
     }
 
-    bool UsedInCol(int col, int num)
+    bool UsedInCol(int col, int num) const
     {
-        for (int row = 0; row < N; row++)
+        for (int row = 0; row < N; ++row)
             if (grid[row][col] == num)
                 return true;
         return false;
     }
 
-    bool UsedInBox(int boxStartRow, int boxStartCol, int num)
+    bool UsedInBox(int boxStartRow, int boxStartCol, int num) const
     {
-        for (int row = 0; row < sqrt(N); row++)
-            for (int col = 0; col < sqrt(N); col++)
+        for (int row = 0; row < static_cast<int>(sqrtN); ++row)
+            for (int col = 0; col < static_cast<int>(sqrtN); ++col)
                 if (grid[row + boxStartRow][col + boxStartCol] == num)
                     return true;
         return false;
     }
 
-    bool isSafe(int row, int col, int num)
+    bool isSafe(int row, int col, int num) const
     {
         return !UsedInRow(row, num) && !UsedInCol(col, num) &&
-               !UsedInBox(row - row % int(sqrt(N)), col - col % int(sqrt(N)), num);
+               !UsedInBox(row - row % static_cast<int>(sqrtN), col - col % static_cast<int>(sqrtN), num);
     }
 
     bool SolveSudoku()
@@ -59,7 +56,7 @@ private:
         int row, col;
         if (!FindUnassignedLocation(row, col))
             return true;
-        for (int num = 1; num <= N; num++)
+        for (int num = 1; num <= N; ++num)
         {
             if (isSafe(row, col, num))
             {
@@ -73,48 +70,44 @@ private:
     }
 
 public:
-    Sudoku(const string &filename)
+    explicit Sudoku(const std::string &filename)
     {
-        ifstream puzzle_file(filename);
-        string line;
-        getline(puzzle_file, line);
-        vector<int> integers;
-        istringstream iss(line);
-        
+        std::ifstream puzzle_file(filename);
+        std::string line;
+        std::getline(puzzle_file, line);
+
+        std::vector<int> integers;
+        std::istringstream iss(line);
+
         int number;
         while (iss >> number)
             integers.push_back(number);
-        N = integers.size();
+
+        N = static_cast<int>(integers.size());
+        sqrtN = static_cast<int>(sqrt(N));
 
         puzzle_file.close();
         puzzle_file.open(filename);
 
         // Allocate memory for the grid
-        grid = new int *[N];
-        for (int i = 0; i < N; ++i)
-            grid[i] = new int[N];
+        grid.resize(N, std::vector<int>(N, 0));
 
         // Assuming the rest of the file contains the puzzle
-        for (int h = 0; h < N; h++)
-            for (int w = 0; w < N; w++)
+        for (int h = 0; h < N; ++h)
+            for (int w = 0; w < N; ++w)
                 puzzle_file >> grid[h][w];
+
         puzzle_file.close();
     }
 
-    ~Sudoku()
-    {
-        // Deallocate memory for the grid
-        for (int i = 0; i < N; ++i)
-            delete[] grid[i];
-        delete[] grid;
-    }
+    ~Sudoku() = default;
 
     void SolveAndPrint()
     {
         if (SolveSudoku())
             printGrid();
         else
-            cout << "No solution exists" << endl;
+            std::cout << "No solution exists" << std::endl;
     }
 
     void printGrid()
@@ -122,8 +115,8 @@ public:
         for (int row = 0; row < N; row++)
         {
             for (int col = 0; col < N; col++)
-                cout << grid[row][col] << " ";
-            cout << endl;
+                std::cout << grid[row][col] << " ";
+            std::cout << std::endl;
         }
     }
 };
@@ -132,11 +125,11 @@ int main(int argc, char *argv[])
 {
     if (argc != 2)
     {
-        cerr << "Input file not found" << endl;
+        std::cerr << "Input file not found" << std::endl;
         return 1;
     }
 
-    string filename = argv[1]; // Use the provided input file name from the command line
+    std::string filename = argv[1]; // Use the provided input file name from the command line
     Sudoku sudoku(filename);
     sudoku.SolveAndPrint();
 
