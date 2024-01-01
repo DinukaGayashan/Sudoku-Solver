@@ -1,29 +1,23 @@
-import subprocess
 import os
+import streamlit as st
+from utility import run_solver
 
 
-def run_solver(input_file):
-    cpp_source = os.path.abspath('solver/solver.cpp')
-    compiled_executable = os.path.abspath('solver/solver')  # Specify the compiled executable path
-
-    # Compile the C++ program
-    compile_command = ['g++', '-o', compiled_executable, cpp_source]
-    subprocess.run(compile_command, check=True)
-
-    # Run the compiled C++ program
-    run_command = [compiled_executable, input_file]
-    process = subprocess.Popen(run_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-    # Wait for the process to finish and get the output
-    stdout, stderr = process.communicate()
-
-    if process.returncode == 0:
-        print(stdout.decode('utf-8'))
-
-    if stderr:
-        print(stderr.decode('utf-8'))
+def gui():
+    st.title('Sudoku Solver')
+    st.divider()
+    left_col, right_col = st.columns([1, 2])
+    with left_col.container():
+        input_method=st.radio("Select the input method",["Input file", "Camera feed"])
+    with right_col.container():
+        if input_method=="Input file":
+            file=st.file_uploader("Select Sudoku image", type=["jpg", "png"])
+        if input_method=="Camera feed":
+            file=st.camera_input("Take Sudoku image")
+    st.divider()
 
 
 if __name__ == "__main__":
-    input_file = os.path.abspath('files/puzzle.txt')
-    run_solver(input_file)
+    gui()
+    # input_file = os.path.abspath('files/puzzle.txt')
+    # run_solver(input_file)

@@ -263,10 +263,25 @@ def process_image(path, puzzle_size):
 def extract_number(image_part):
     custom_config = r'--psm 10 --oem 3 -c tessedit_char_whitelist=0123456789'
     # custom_config = r'--psm 6 --oem 3 -c tessedit_char_whitelist=0123456789 -l eng'
-    # custom_config = r'--psm 10 --oem 3 -l eng'
+    # custom_config = ("-c tessedit" "_char_whitelist=0123456789" " --psm 10" " -l osd" " ")
     txt = pytesseract.image_to_string(image_part,config=custom_config)
     return txt
 
+
+def remove_pixels(image, pixels_to_remove):
+    # Get image dimensions
+    height, width = image.shape
+
+    # Define the region to keep (excluding pixels_to_remove from each side)
+    top = pixels_to_remove
+    bottom = height - pixels_to_remove
+    left = pixels_to_remove
+    right = width - pixels_to_remove
+
+    # Crop the image
+    cropped_image = image[top:bottom, left:right]
+
+    return cropped_image
 
 def get_puzzle(image, puzzle_size):
     num_rows=puzzle_size
@@ -286,6 +301,7 @@ def get_puzzle(image, puzzle_size):
             x1 = j * square_width
             x2 = (j + 1) * square_width
             square_part = image[y1:y2, x1:x2]
+            # square_part=remove_pixels(square_part,2)
             s=extract_number(square_part)
             s='0' if s == '' else s
             number = int(s.strip())

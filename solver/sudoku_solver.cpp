@@ -102,21 +102,23 @@ public:
 
     ~Sudoku() = default;
 
-    void SolveAndPrint()
+    void SolveAndPrint(std::string filename)
     {
         if (SolveSudoku())
-            printGrid();
+            printGrid(filename);
         else
             std::cout << "No solution exists" << std::endl;
     }
 
-    void printGrid()
+    void printGrid(std::string filename)
     {
+        std::string output_filename = filename.substr(0, filename.find_last_of('.')) + "_output.txt";
+        std::ofstream output_file(output_filename);
         for (int row = 0; row < N; row++)
         {
             for (int col = 0; col < N; col++)
-                std::cout << grid[row][col] << " ";
-            std::cout << std::endl;
+                output_file << grid[row][col] << " ";
+            output_file << std::endl;
         }
     }
 };
@@ -129,9 +131,9 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    std::string filename = argv[1]; // Use the provided input file name from the command line
+    std::string filename = argv[1];
     Sudoku sudoku(filename);
-    sudoku.SolveAndPrint();
+    sudoku.SolveAndPrint(filename);
 
     return 0;
 }
