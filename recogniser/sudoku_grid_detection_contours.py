@@ -55,7 +55,7 @@ def find_sudoku_grid(image_path):
 
     if len(approx)>=4:
         sorted_points = sorted(approx, key=lambda x: x[0][1])
-        print('sorted points: ',sorted_points)
+        # print('sorted points: ',sorted_points)
 
         if len(puzzle_corners) < 4:
             puzzle_corners.extend([None] * (4 - len(puzzle_corners)))
@@ -88,9 +88,10 @@ def find_sudoku_grid(image_path):
     warped_eroded = cv2.erode(warped_otsued, np.ones((3, 3), np.uint8), iterations=1)
     warped_edges = cv2.Canny(warped_eroded, 50, 150, apertureSize=3)
 
-    cv2.imshow('canny',warped_edges)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+    save_warped_image(warped_image)
+    # cv2.imshow('canny',warped_image)
+    # cv2.waitKey(0)
+    # cv2.destroyAllWindows()
 
     warped_contours, _ = cv2.findContours(warped_edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     cv2.drawContours(warped_image, warped_contours, -1, (0, 255, 0), 3)
@@ -108,23 +109,23 @@ def find_sudoku_grid(image_path):
                 minimum_Area = area
                 min_area_contour=contour
 
-    print('minimum area cotour:',min_area_contour)   
+    # print('minimum area cotour:',min_area_contour)   
     cv2.drawContours(warped_image, min_area_contour, -1, (0,0,255), 5)
 
-    cv2.imshow('min contour',warped_image)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+    # cv2.imshow('min contour',warped_image)
+    # cv2.waitKey(0)
+    # cv2.destroyAllWindows()
 
     minArea_precentage = minimum_Area / ( original_image.shape[0] *  original_image.shape[1])
 
-    print('minArea_precentage',minArea_precentage)
+    # print('minArea_precentage',minArea_precentage)
     
     if abs(minArea_precentage - sudoku_area[0]) < abs(minArea_precentage - sudoku_area[1]):
         sudoku_mode = 9
     else:
         sudoku_mode = 16
 
-    print('sudoku mode',sudoku_mode)
+    # print('sudoku mode',sudoku_mode)
 
     matrix = [[0 for _ in range(sudoku_mode)] for _ in range(sudoku_mode)]
 
@@ -134,13 +135,39 @@ def find_sudoku_grid(image_path):
 
    
 
+def save_warped_image(image):
+    # Get the dimensions of the original image
+    height, width, _ = image.shape
+
+    # Determine the size of the square (take the maximum dimension)
+    square_size = max(height, width)
+
+    # Create an empty square canvas
+    square_image = np.zeros((square_size, square_size, 3), dtype=np.uint8)
+
+    # Calculate the scaling factors for stretching the image
+    scale_x = square_size / width
+    scale_y = square_size / height
+
+    # Resize the original image to fit the square canvas
+    stretched_image = cv2.resize(image, (0, 0), fx=scale_x, fy=scale_y)
+
+    # Calculate the region to paste the stretched image onto the square canvas
+    x_offset = (square_size - stretched_image.shape[1]) // 2
+    y_offset = (square_size - stretched_image.shape[0]) // 2
+
+    # Paste the stretched image onto the square canvas
+    square_image[y_offset:y_offset+stretched_image.shape[0], x_offset:x_offset+stretched_image.shape[1]] = stretched_image
+
+    resized_image = cv2.resize(square_image, (960, 960))
+
+    cv2.imwrite("files\puzzle.jpg",resized_image)
 
 
 
 
 
-
-find_sudoku_grid('sudoku.jpg')
+# find_sudoku_grid('sudoku.jpg')
 
 
 

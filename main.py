@@ -1,9 +1,9 @@
 import os
 import streamlit as st
-from utility import run_solver
+import utility 
 
 
-def run_gui():
+if __name__ == "__main__":
     st.title("Sudoku Solver")
     st.divider()
     left_col, right_col = st.columns([1, 2])
@@ -19,11 +19,15 @@ def run_gui():
     st.divider()
     if solve:
         with st.spinner("Please wait while puzzle is solving."):
+            utility.extract_sudoku()
             input_file = os.path.abspath("files/puzzle.txt")
-            run_solver(input_file)
-            st.image("files/puzzle.jpg", caption="Solved Sudoku puzzle")
+            solved=utility.run_solver(input_file)
 
-
-if __name__ == "__main__":
-    run_gui()
+            if solved:
+                with open("files/puzzle_output.txt", "r") as solved_file, open("files/puzzle.txt", "r") as original_file:
+                    solved_values = [list(map(int, line.strip().split())) for line in solved_file]
+                    original_values = [list(map(int, line.strip().split())) for line in original_file]
+                
+                    solved_image=utility.get_solved_image("files/puzzle.jpg",original_values,solved_values)
+                    st.image(solved_image, caption="Solved Sudoku puzzle")
 
