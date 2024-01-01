@@ -3,8 +3,8 @@ import streamlit as st
 from utility import run_solver
 
 
-def gui():
-    st.title('Sudoku Solver')
+def run_gui():
+    st.title("Sudoku Solver")
     st.divider()
     left_col, right_col = st.columns([1, 2])
     with left_col.container():
@@ -14,10 +14,16 @@ def gui():
             file=st.file_uploader("Select Sudoku image", type=["jpg", "png"])
         if input_method=="Camera feed":
             file=st.camera_input("Take Sudoku image")
+    st.title("")
+    solve=st.button("Solve",disabled= False if file else True)
     st.divider()
+    if solve:
+        with st.spinner("Please wait while puzzle is solving."):
+            input_file = os.path.abspath("files/puzzle.txt")
+            run_solver(input_file)
+            st.image("files/puzzle.jpg", caption="Solved Sudoku puzzle")
 
 
 if __name__ == "__main__":
-    gui()
-    # input_file = os.path.abspath('files/puzzle.txt')
-    # run_solver(input_file)
+    run_gui()
+
