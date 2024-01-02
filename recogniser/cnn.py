@@ -1,4 +1,4 @@
-import logging
+# import logging
 import os
 
 from sklearn.metrics import classification_report
@@ -17,14 +17,14 @@ from tensorflow.keras.optimizers import Adam
 
 from typing import Optional
 
-import setup_logger  # noqa: F401
+# import setup_logger  # noqa: F401
 
 INIT_LR = 1e-3
 EPOCHS = 10
 BS = 128
 
 
-logger = logging.getLogger("visiondoku.sudokunet")
+# logger = logging.getLogger("visiondoku.sudokunet")
 
 
 class SudokuNet:
@@ -41,7 +41,7 @@ class SudokuNet:
         self.depth: int = depth
         self.classes: int = classes
         self.model_name: str = name
-        self.model_path: str = os.path.join() # add the required path
+        self.model_path: str = os.path.join("files/model/") # add the required path
         self.model = None
 
     def predict(self, digit):
@@ -54,7 +54,7 @@ class SudokuNet:
         self._build_model()
         self._compile_model()
 
-        logger.info("Training model ...")
+        # logger.info("Training model ...")
         self.model.fit(
             self.train_data,
             self.train_labels,
@@ -68,22 +68,22 @@ class SudokuNet:
         self._serialize_model()
 
     def _serialize_model(self):
-        logger.info("Serializing digit model...")
+        # logger.info("Serializing digit model...")
         self.model.save(self.model_path)
 
     def _evaluate_model(self) -> None:
-        logger.info("Evaluating model ...")
+        # logger.info("Evaluating model ...")
         predictions = self.model.predict(self.test_data)
-        logger.info(
-            classification_report(
-                self.test_labels.argmax(axis=1),
-                predictions.argmax(axis=1),
-                target_names=[str(x) for x in self.le.classes_],
-            )
-        )
+        # logger.info(
+        #     classification_report(
+        #         self.test_labels.argmax(axis=1),
+        #         predictions.argmax(axis=1),
+        #         target_names=[str(x) for x in self.le.classes_],
+        #     )
+        # )
 
     def _compile_model(self) -> None:
-        logger.info("Compiling model ...")
+        # logger.info("Compiling model ...")
         self.model.compile(
             loss="categorical_crossentropy",
             optimizer=Adam(learning_rate=INIT_LR),
@@ -91,13 +91,13 @@ class SudokuNet:
         )
 
     def _load_model(self):
-        logger.info(f"Loading model {self.model_path} ...")
+        # logger.info(f"Loading model {self.model_path} ...")
         if self.model is None:
             self.model = load_model(self.model_path)
 
 
     def _load_data(self) -> None:
-        logger.info("Loading MNIST dataset ...")
+        # logger.info("Loading MNIST dataset ...")
         (
             (self.train_data, self.train_labels),
             (self.test_data, self.test_labels),
@@ -114,7 +114,7 @@ class SudokuNet:
         self.test_labels = self.le.transform(self.test_labels)
 
     def _build_model(self) -> None:
-        logger.info("Building model ...")
+        # logger.info("Building model ...")
         model = Sequential()
         inputShape = (self.height, self.width, self.depth)
 

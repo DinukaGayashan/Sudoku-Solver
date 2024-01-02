@@ -1,11 +1,38 @@
+import os
 import cv2
 import numpy as np
+from recogniser.cnn import SudokuNet
+from keras.preprocessing.image import img_to_array
+
+
+def run_recognizer(image):
+    sudokunet = SudokuNet()
+
+    file_path = "files\model\saved_model.pb"
+    if not os.path.exists(file_path):
+        sudokunet.train_model()
+
+    image = cv2.bitwise_not(image)
+    (thresh, im_bw) = cv2.threshold(image, 128, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
+    thresh = 127
+    digit = cv2.threshold(image, thresh, 255, cv2.THRESH_BINARY)[1]
+    
+    
+    digit = cv2.resize(digit, (28, 28))
+    cv2.imwrite('test.png', digit)
+    # print(digit)
+    digit = digit / 255.0
+    
+    img = img_to_array(digit)
+    img = np.expand_dims(img, axis=0)
+    return sudokunet.predict(img)
 
 
 def read_sudoku_grid(result,sudoku_mode,matrix):
 
     print('selected mode:',sudoku_mode)
 
+    digits=[]
     for i in range(sudoku_mode):
         for j in range(sudoku_mode):
 
@@ -29,16 +56,19 @@ def read_sudoku_grid(result,sudoku_mode,matrix):
 
             to_model  = region_of_interest[y:y + h, x:x + w]
 
-            #send to model
+            digits.append(run_recognizer(to_model))
+    
+    print(digits)
+    save_puzzle(sudoku_mode,digits)
+            
 
 
 
-def find_sudoku_grid(image_path):
+def find_sudoku_grid(image):
 
     sudoku_area=[1/81,1/256]
     puzzle_corners=[]
 
-    image = cv2.imread(image_path)
     original_image = image.copy()
 
     gray = cv2.cvtColor(original_image, cv2.COLOR_BGR2GRAY)
@@ -133,43 +163,35 @@ def find_sudoku_grid(image_path):
 
 
 
-   
-
 def save_warped_image(image):
-    # Get the dimensions of the original image
     height, width, _ = image.shape
-
-    # Determine the size of the square (take the maximum dimension)
     square_size = max(height, width)
-
-    # Create an empty square canvas
     square_image = np.zeros((square_size, square_size, 3), dtype=np.uint8)
 
-    # Calculate the scaling factors for stretching the image
     scale_x = square_size / width
     scale_y = square_size / height
 
-    # Resize the original image to fit the square canvas
     stretched_image = cv2.resize(image, (0, 0), fx=scale_x, fy=scale_y)
 
-    # Calculate the region to paste the stretched image onto the square canvas
     x_offset = (square_size - stretched_image.shape[1]) // 2
     y_offset = (square_size - stretched_image.shape[0]) // 2
 
-    # Paste the stretched image onto the square canvas
     square_image[y_offset:y_offset+stretched_image.shape[0], x_offset:x_offset+stretched_image.shape[1]] = stretched_image
-
     resized_image = cv2.resize(square_image, (960, 960))
 
-    cv2.imwrite("files\puzzle.jpg",resized_image)
+    cv2.imwrite("files/puzzle.jpg",resized_image)
 
 
+def save_puzzle(size,digits):
+    puzzle = [[0] * size for _ in range(size)]
 
+    for i in range(size):
+        for j in range(size):
+            puzzle[i][j] = digits[i * size + j]
 
-
-# find_sudoku_grid('sudoku.jpg')
-
-
-
+    with open("files/puzzle.txt", 'w') as file:
+        for row in puzzle:
+            line = ' '.join(map(str, row)) + '\n'
+            file.write(line)
 
 

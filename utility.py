@@ -3,6 +3,12 @@ import os
 import cv2
 from recogniser.sudoku_grid_detection_contours import find_sudoku_grid
 
+
+def extract_sudoku(filename):
+    image = cv2.imread(filename)
+    find_sudoku_grid(image)
+
+
 def run_solver(input_filename):
     solver_name="solver/sudoku_solver"
     cpp_source = os.path.abspath(solver_name+".cpp")
@@ -24,7 +30,6 @@ def run_solver(input_filename):
         print(stderr.decode('utf-8'))
         return False
     
-
 
 def get_solved_image(image,original_values,solved_values):
     sudoku_length=len(original_values)
@@ -52,7 +57,5 @@ def get_solved_image(image,original_values,solved_values):
 
     return image
 
-def extract_sudoku():
-    find_sudoku_grid('files/sudoku.jpg')
     
 

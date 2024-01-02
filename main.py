@@ -19,7 +19,7 @@ if __name__ == "__main__":
     st.divider()
     if solve:
         with st.spinner("Please wait while puzzle is solving."):
-            utility.extract_sudoku()
+            utility.extract_sudoku("files/sudoku.jpg")
             input_file = os.path.abspath("files/puzzle.txt")
             solved=utility.run_solver(input_file)
 
