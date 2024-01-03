@@ -21,6 +21,7 @@ if __name__ == "__main__":
     if solve:
         with st.spinner("Please wait while puzzle is solving."):
             utility.extract_sudoku(file)
+            utility.get_puzzle("files/puzzle.jpg",9)
             valid_sudoku = utility.is_valid_sudoku("files/puzzle.txt")
             if utility.is_valid_sudoku('files/puzzle.txt'):
 

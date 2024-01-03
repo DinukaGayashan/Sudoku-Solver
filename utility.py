@@ -2,15 +2,60 @@ import os
 import subprocess
 
 import cv2
+import sys
 
-from recogniser.sudoku_grid_detection_contours import find_sudoku_grid
-
-
-def extract_sudoku(filename):
-    image = cv2.imread(filename)
-    find_sudoku_grid(image)
+from recogniser.recogniser import run
+from recogniser.cnn import SudokuNet
 
 
+def extract_sudoku(file):
+    filename="files/sudoku.jpg"
+    with open(filename, "wb") as f:
+        f.write(file.getbuffer())
+    run(filename)
+    # find_sudoku_grid(image)
+
+
+def extract_digit(cell, i, j, sudokunet):
+    cv2.imshow('',cell)
+    cv2.waitKey(0)
+
+    return 0
+
+
+def get_puzzle(filename, puzzle_size):
+    image=cv2.imread(filename)
+    num_rows=puzzle_size
+    num_cols=puzzle_size
+    height, width = image.shape[:2]
+
+    square_height = height // num_rows
+    square_width = width // num_cols
+
+    puzzle = []
+
+    for i in range(num_rows):
+        row = []  # Initialize a new row for each iteration
+        for j in range(num_cols):
+            y1 = i * square_height
+            y2 = (i + 1) * square_height
+            x1 = j * square_width
+            x2 = (j + 1) * square_width
+            square_part = image[y1:y2, x1:x2]
+
+            sudokunet = SudokuNet()
+
+            s=extract_digit(square_part,i,j,sudokunet)
+            s='0' #if s == '' else s
+            number = int(s)#.strip())
+            row.append(0 if number is None else number)
+        puzzle.append(row)
+
+    with open("files/puzzle.txt", 'w') as file:
+        for row in puzzle:
+            file.write(' '.join(map(str, row)) + '\n')
+
+    
 def run_solver(input_filename):
     solver_name = "solver/sudoku_solver"
     cpp_source = os.path.abspath(solver_name + ".cpp")
@@ -25,7 +70,7 @@ def run_solver(input_filename):
     ]
     subprocess.run(compile_command, check=True)
 
-    run_command = [compiled_executable, input_filename]
+    run_command = [sys.executable, input_filename]
     subprocess.run(run_command)
 
     return True
