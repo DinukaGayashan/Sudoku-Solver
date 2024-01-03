@@ -3,34 +3,109 @@ import cv2
 import numpy as np
 from recogniser.cnn import SudokuNet
 from keras.preprocessing.image import img_to_array
+import imutils
+from skimage.segmentation import clear_border
+
+def extract_digit(cell, i, j, sudokunet):
+    thresh = cv2.threshold(cell, 0, 255,cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)[1]
+    thresh = clear_border(thresh)
+    # find contours in the thresholded cell
+    cnts = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    cnts = imutils.grab_contours(cnts)
+    # if no contours were found than this is an empty cell
+    if len(cnts) == 0:
+        return 0
+    c = max(cnts, key=cv2.contourArea)
+    mask = np.zeros(thresh.shape, dtype="uint8")
+    cv2.drawContours(mask, [c], -1, 255, -1)
+
+    # compute the percentage of masked pixels relative to the total
+    # area of the image
+    (h, w) = thresh.shape
+    percentFilled = cv2.countNonZero(mask) / float(w * h)
+    # if less than 3% of the mask is filled then we are looking at
+    # noise and can safely ignore the contour
+    if percentFilled < 0.03:
+        return 0
+    # apply the mask to the thresholded cell
+    
+    digit = cv2.bitwise_and(thresh, thresh, mask=mask)
+    # check to see if we should visualize the masking step
+    # return the digit to the calling function
+    padding_top = 4
+    padding_bottom = 4
+    padding_left = 4
+    padding_right = 4
+
+    # Specify border type (you can choose from cv2.BORDER_CONSTANT, cv2.BORDER_REPLICATE, etc.)
+    border_type = cv2.BORDER_CONSTANT
+
+    # Specify padding color (default is black)
+    padding_color = (0, 0, 0)
+
+    # Add padding to the image using cv2.copyMakeBorder
+    digit = cv2.copyMakeBorder(digit, padding_top, padding_bottom, padding_left, padding_right, border_type, value=padding_color)
+    
+    mask = np.ones_like(digit)
+    thickness = 2
+    mask[thickness:-thickness, thickness:-thickness] = 0
+
+    digit[mask.astype(bool)] = 0
+    
+    roi = cv2.resize(digit, (28, 28))
+    cv2.imwrite(f'test{i}{j}.png', roi)
+    # roi = roi.astype("float") / 255.0
+    roi = img_to_array(roi)
+    roi = np.expand_dims(roi, axis=0)
+    # classify the digit and update the Sudoku board with the
+    # prediction
+    pred = sudokunet.predict(roi)
+    return pred
 
 
-def run_recognizer(image):
+
+
+def run_recognizer(image, i, j):
     sudokunet = SudokuNet()
 
-    file_path = "files\model\saved_model.pb"
+    file_path = "files/model/saved_model.pb"
     if not os.path.exists(file_path):
         sudokunet.train_model()
 
     image = cv2.bitwise_not(image)
-    (thresh, im_bw) = cv2.threshold(image, 128, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
+    
+
+    thresh = cv2.threshold(image, 128, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
     thresh = 127
     digit = cv2.threshold(image, thresh, 255, cv2.THRESH_BINARY)[1]
-    
+
+    # cnts = cv2.findContours(thresh, cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
+    # cnts = imutils.grab_contours(cnts)
+
+    # if len(cnts) == 0:
+    #     return 0
     
     digit = cv2.resize(digit, (28, 28))
-    cv2.imwrite('test.png', digit)
+    mask = np.ones_like(digit)
+    thickness = 2
+    mask[thickness:-thickness, thickness:-thickness] = 0
+
+    digit[mask.astype(bool)] = 0
+    cv2.imwrite(f'test{i}{j}.png', digit)
     # print(digit)
-    digit = digit / 255.0
     
     img = img_to_array(digit)
     img = np.expand_dims(img, axis=0)
-    return sudokunet.predict(img)
+    prediction = sudokunet.predict(img)
+    print(f"{i}{j} == {prediction}")
+    return prediction
 
 
 def read_sudoku_grid(result,sudoku_mode,matrix):
 
     print('selected mode:',sudoku_mode)
+
+    sudokunet = SudokuNet()
 
     digits=[]
     for i in range(sudoku_mode):
@@ -56,7 +131,7 @@ def read_sudoku_grid(result,sudoku_mode,matrix):
 
             to_model  = region_of_interest[y:y + h, x:x + w]
 
-            digits.append(run_recognizer(to_model))
+            digits.append(extract_digit(to_model, i, j, sudokunet))
     
     print(digits)
     save_puzzle(sudoku_mode,digits)
