@@ -2,7 +2,7 @@ import numpy as np
 import cv2
 import operator
 import numpy as np
-import pytesseract
+# import pytesseract
 from matplotlib import pyplot as plt
 
 
@@ -34,7 +34,7 @@ def pre_process_image(img, skip_dilate=False):
 
     # Gaussian blur with a kernal size (height, width) of 9.
     # Note that kernal sizes must be positive and odd and the kernel must be square.
-    proc = cv2.GaussianBlur(img.copy(), (9, 9), 0)
+    proc = cv2.GaussianBlur(img.copy(), (5, 5), 0)
 
     # Adaptive threshold using 11 nearest neighbour pixels
     proc = cv2.adaptiveThreshold(proc, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
@@ -262,26 +262,13 @@ def process_image(path, puzzle_size):
 
 def extract_number(image_part):
     custom_config = r'--psm 10 --oem 3 -c tessedit_char_whitelist=0123456789'
-    # custom_config = r'--psm 6 --oem 3 -c tessedit_char_whitelist=0123456789 -l eng'
-    # custom_config = ("-c tessedit" "_char_whitelist=0123456789" " --psm 10" " -l osd" " ")
-    txt = pytesseract.image_to_string(image_part,config=custom_config)
-    return txt
+    custom_config = r'--psm 6 --oem 3 -c tessedit_char_whitelist=0123456789 -l eng'
+    custom_config = r'--psm 10 --oem 3 -l eng'
+    # txt = pytesseract.image_to_string(image_part,config=custom_config)
+    # return txt
+    # cv2.imshow('',image_part)
+    # cv2.waitKey(0)
 
-
-def remove_pixels(image, pixels_to_remove):
-    # Get image dimensions
-    height, width = image.shape
-
-    # Define the region to keep (excluding pixels_to_remove from each side)
-    top = pixels_to_remove
-    bottom = height - pixels_to_remove
-    left = pixels_to_remove
-    right = width - pixels_to_remove
-
-    # Crop the image
-    cropped_image = image[top:bottom, left:right]
-
-    return cropped_image
 
 def get_puzzle(image, puzzle_size):
     num_rows=puzzle_size
@@ -301,10 +288,9 @@ def get_puzzle(image, puzzle_size):
             x1 = j * square_width
             x2 = (j + 1) * square_width
             square_part = image[y1:y2, x1:x2]
-            # square_part=remove_pixels(square_part,2)
             s=extract_number(square_part)
-            s='0' if s == '' else s
-            number = int(s.strip())
+            s='0' #if s == '' else s
+            number = int(s)#.strip())
             row.append(0 if number is None else number)
         puzzle.append(row)
 
@@ -338,13 +324,36 @@ def save_puzzle_to_file(puzzle,filename):
             file.write(' '.join(map(str, row)) + '\n')
 
 
+def save_warped_image(image,path):
+    height, width = image.shape
+    square_size = max(height, width)
+    square_image = np.zeros((square_size, square_size, 3), dtype=np.uint8)
 
-if __name__ == '__main__':
+    scale_x = square_size / width
+    scale_y = square_size / height
+
+    stretched_image = cv2.resize(image, (0, 0), fx=scale_x, fy=scale_y)
+
+    x_offset = (square_size - stretched_image.shape[1]) // 2
+    y_offset = (square_size - stretched_image.shape[0]) // 2
+
+
+    stretched_image = cv2.cvtColor(stretched_image, cv2.COLOR_GRAY2BGR)
+
+    square_image[
+        y_offset : y_offset + stretched_image.shape[0],
+        x_offset : x_offset + stretched_image.shape[1],
+    ] = stretched_image
+    resized_image = cv2.resize(square_image, (960, 960))
+
+    cv2.imwrite(path, resized_image)
+
+
+def run(filename):
     puzzle_size=9
-    image_path = 'files\sudoku.jpg'
     puzzle_path='files\puzzle.txt'
-    processed_image = process_image(image_path,puzzle_size)
-    cv2.imwrite('files\puzzle.jpg', processed_image)
+    processed_image = process_image(filename,puzzle_size)
+    save_warped_image(processed_image,"files/puzzle.jpg")
 
     puzzle=get_puzzle(processed_image,puzzle_size)
     for row in puzzle:
@@ -352,6 +361,10 @@ if __name__ == '__main__':
     print(is_valid_sudoku(puzzle,puzzle_size))
 
     save_puzzle_to_file(puzzle, puzzle_path)
+
+
+if __name__ == '__main__':
+    run()
 
     # cv2.imwrite('recogniser\puzzle.jpg', image)
 
