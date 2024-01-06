@@ -9,13 +9,13 @@ from keras.preprocessing.image import img_to_array
 from skimage.segmentation import clear_border
 
 from recogniser.cnn import SudokuNet
-from recogniser.recogniser import run
+from recogniser.recogniser import image_processing
 
 
-def extract_sudoku(file, original_image, processed_image, extracted_puzzle):
+def extract_sudoku(file, original_image, processed_image):
     with open(original_image, "wb") as f:
         f.write(file.getbuffer())
-    run(original_image, processed_image, extracted_puzzle)
+    image_processing(original_image, processed_image)
     # find_sudoku_grid(image)
 
 

@@ -19,7 +19,7 @@ if __name__ == "__main__":
         if input_method == "Camera feed":
             file = st.camera_input("Take Sudoku image")
     st.title("")
-    
+
     solve = st.button("Solve", disabled=False if file else True)
     st.divider()
     if solve:
@@ -31,7 +31,7 @@ if __name__ == "__main__":
             solver_name = os.path.join("solver", "sudoku_solver")
 
             utility.extract_sudoku(file, original_image,
-                                   processed_image, extracted_puzzle)
+                                   processed_image)
             utility.get_puzzle(processed_image, extracted_puzzle, 9)
             if utility.is_valid_sudoku(extracted_puzzle):
                 input_file = os.path.abspath(extracted_puzzle)
