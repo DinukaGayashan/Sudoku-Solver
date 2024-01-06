@@ -349,16 +349,16 @@ def save_warped_image(image,path):
     cv2.imwrite(path, resized_image)
 
 
-def run(filename):
-    puzzle_size=9
-    puzzle_path='files\puzzle.txt'
-    processed_image = process_image(filename,puzzle_size)
-    save_warped_image(processed_image,"files/puzzle.jpg")
+def run(original_image,save_image,extracted_puzzle):
+    puzzle_size=9 
+    puzzle_path=extracted_puzzle
+    processed_image = process_image(original_image,puzzle_size)
+    save_warped_image(processed_image,save_image)
 
     puzzle=get_puzzle(processed_image,puzzle_size)
-    for row in puzzle:
-        print(row)
-    print(is_valid_sudoku(puzzle,puzzle_size))
+    # for row in puzzle:
+    #     print(row)
+    # print(is_valid_sudoku(puzzle,puzzle_size))
 
     save_puzzle_to_file(puzzle, puzzle_path)
 

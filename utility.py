@@ -1,6 +1,5 @@
 import os
 import subprocess
-import sys
 
 import cv2
 import imutils
@@ -13,11 +12,10 @@ from recogniser.cnn import SudokuNet
 from recogniser.recogniser import run
 
 
-def extract_sudoku(file):
-    filename = "files/sudoku.jpg"
-    with open(filename, "wb") as f:
+def extract_sudoku(file, original_image, processed_image, extracted_puzzle):
+    with open(original_image, "wb") as f:
         f.write(file.getbuffer())
-    run(filename)
+    run(original_image, processed_image, extracted_puzzle)
     # find_sudoku_grid(image)
 
 
@@ -34,10 +32,11 @@ def apply_raw_cell(cell):
 
 
 def extract_digit(cell, i, j, sudokunet):
-    
+
     cell = cv2.cvtColor(cell, cv2.COLOR_BGR2GRAY)
     img = apply_raw_cell(cell)
-    thresh = cv2.threshold(cell, 0, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)[1]
+    thresh = cv2.threshold(
+        cell, 0, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)[1]
     thresh = clear_border(thresh)
 
     cnts = cv2.findContours(cell, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -88,8 +87,8 @@ def extract_digit(cell, i, j, sudokunet):
         )
     except Exception as e:
         tess_pred = 0
-    
-    cv2.imwrite(f"test{i}{j}.png", roi)
+
+    # cv2.imwrite(f"test{i}{j}.png", roi)
     roi = img_to_array(roi)
     roi = np.expand_dims(roi, axis=0)
     pred, confident = sudokunet.predict_(roi)
@@ -101,21 +100,19 @@ def extract_digit(cell, i, j, sudokunet):
         if pred < 1 or pred > 9:
             roi2 = cv2.resize(img, (28, 28))
             roi2 = img_to_array(roi2)
-            roi2= np.expand_dims(roi2, axis=0)
+            roi2 = np.expand_dims(roi2, axis=0)
             pred2, confident2 = sudokunet.predict_(roi2)
             if confident2 * 100 > 60:
                 pred = pred2
             else:
                 pred = 0
-    
-    
 
     print(f"[{i}][{j}] = {pred} - {confident}%")
     print(pred_count)
     return pred
 
 
-def get_puzzle(filename, puzzle_size):
+def get_puzzle(filename, extracted_puzzle, puzzle_size):
     image = cv2.imread(filename)
     num_rows = puzzle_size
     num_cols = puzzle_size
@@ -129,7 +126,7 @@ def get_puzzle(filename, puzzle_size):
     sudokunet = SudokuNet()
 
     for i in range(num_rows):
-        row = []  # Initialize a new row for each iteration
+        row = []
         for j in range(num_cols):
             y1 = i * square_height
             y2 = (i + 1) * square_height
@@ -142,13 +139,12 @@ def get_puzzle(filename, puzzle_size):
             row.append(0 if number is None else number)
         puzzle.append(row)
 
-    with open("files/puzzle.txt", "w") as file:
+    with open(extracted_puzzle, "w") as file:
         for row in puzzle:
             file.write(" ".join(map(str, row)) + "\n")
 
 
-def run_solver(input_filename):
-    solver_name = "solver/sudoku_solver"
+def run_solver(solver_name, input_filename):
     cpp_source = os.path.abspath(solver_name + ".cpp")
     compiled_executable = os.path.abspath(solver_name)
 
@@ -159,15 +155,32 @@ def run_solver(input_filename):
         compiled_executable,
         cpp_source,
     ]
-    subprocess.run(compile_command, check=True)
+    subprocess.run(compile_command)
 
-    run_command = [sys.executable, input_filename]
-    subprocess.run(run_command)
+    run_command = [compiled_executable, input_filename]
+    process = subprocess.Popen(
+        run_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-    return True
+    stdout, stderr = process.communicate()
+
+    if process.returncode == 0:
+        # print(stdout.decode('utf-8'))
+        return True
+
+    if stderr:
+        print(stderr.decode('utf-8'))
+        return False
 
 
-def get_solved_image(image, original_values, solved_values):
+def get_solved_image(image, original_puzzle, solved_puzzle):
+    with open(solved_puzzle, "r") as solved_file, open(
+        original_puzzle, "r"
+    ) as original_file:
+        solved_values = [list(map(int, line.strip().split()))
+                         for line in solved_file]
+        original_values = [list(map(int, line.strip().split()))
+                           for line in original_file]
+
     sudoku_length = len(original_values)
 
     image = cv2.imread(image)
@@ -175,7 +188,7 @@ def get_solved_image(image, original_values, solved_values):
     font = cv2.FONT_HERSHEY_DUPLEX
     font_scale = 2
     font_thickness = 2
-    font_color = (120, 60, 120)
+    font_color = (100, 180, 100)
     line_type = cv2.LINE_AA
 
     height, _, _ = image.shape
