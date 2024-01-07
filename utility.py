@@ -7,15 +7,31 @@ import numpy as np
 import pytesseract
 from keras.preprocessing.image import img_to_array
 from skimage.segmentation import clear_border
+# from keras.models import load_model
 
 from recogniser.cnn import SudokuNet
 from recogniser.recogniser import image_processing
+from recogniser.sudoku_grid_detection_contours import find_sudoku_grid
+
+# classifier=load_model("files\digit_model.h5")
+
+# def add_pading(image):
+#     top_pad = 10
+#     bottom_pad = 10
+#     left_pad = 10
+#     right_pad = 10
+#     return cv2.copyMakeBorder(image, top_pad, bottom_pad, left_pad, right_pad, cv2.BORDER_CONSTANT, value=(0, 0, 0))
 
 
-def extract_sudoku(file, original_image, processed_image):
+
+def extract_sudoku(file, original_image, processed_image,size_file):
     with open(original_image, "wb") as f:
         f.write(file.getbuffer())
-    image_processing(original_image, processed_image)
+    size=find_sudoku_grid(original_image)
+    with open(size_file, "w") as file:
+        file.write(str(size))
+    
+    image_processing(original_image, processed_image,size)
     # find_sudoku_grid(image)
 
 
@@ -32,13 +48,12 @@ def apply_raw_cell(cell):
 
 
 def extract_digit(cell, i, j, sudokunet):
-
-    cell = cv2.cvtColor(cell, cv2.COLOR_BGR2GRAY)
+    # cell = cv2.cvtColor(cell, cv2.COLOR_BGR2GRAY)
     img = apply_raw_cell(cell)
     thresh = cv2.threshold(
         cell, 0, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)[1]
     thresh = clear_border(thresh)
-
+    # cv2.imwrite(f'to_model{i}{j}.png',img)
     cnts = cv2.findContours(cell, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     cnts = imutils.grab_contours(cnts)
 
@@ -85,6 +100,7 @@ def extract_digit(cell, i, j, sudokunet):
                 digit, config="--psm 10 --oem 3 -c tessedit_char_whitelist=0123456789 outputbase digits"
             ).strip()
         )
+        print(tess_pred)
     except Exception as e:
         tess_pred = 0
 
@@ -92,6 +108,11 @@ def extract_digit(cell, i, j, sudokunet):
     roi = img_to_array(roi)
     roi = np.expand_dims(roi, axis=0)
     pred, confident = sudokunet.predict_(roi)
+    # predictions = classifier.predict(roi)
+    # predicted_classes = np.argmax(predictions, axis=1)
+
+    # print(predicted_classes)
+    # return predicted_classes[0]
     global pred_count
     pred_count += 1
 
@@ -112,32 +133,71 @@ def extract_digit(cell, i, j, sudokunet):
     return pred
 
 
-def get_puzzle(filename, extracted_puzzle, puzzle_size):
-    image = cv2.imread(filename)
-    num_rows = puzzle_size
-    num_cols = puzzle_size
-    height, width = image.shape[:2]
+def get_puzzle(filename, extracted_puzzle, size_file):
+    with open(size_file, "r") as file:
+        sudoku_mode = int(file.readline())
 
-    square_height = height // num_rows
-    square_width = width // num_cols
+    image = cv2.imread(filename)
+    # num_rows = puzzle_size
+    # num_cols = puzzle_size
+    
+    height, width = image.shape[:2]
+    square_height = height // sudoku_mode
+    square_width = width // sudoku_mode
 
     puzzle = []
 
     sudokunet = SudokuNet()
 
-    for i in range(num_rows):
+    for i in range(sudoku_mode):
         row = []
-        for j in range(num_cols):
-            y1 = i * square_height
-            y2 = (i + 1) * square_height
-            x1 = j * square_width
-            x2 = (j + 1) * square_width
-            square_part = image[y1:y2, x1:x2]
+        for j in range(sudoku_mode):
 
-            s = extract_digit(square_part, i, j, sudokunet)
-            number = s
+            height=image.shape[0]
+            width=image.shape[1]
+    
+            region_of_interest = image[round((i * height / sudoku_mode)):round(((i + 1) *height / sudoku_mode)),
+            round((j * width / sudoku_mode)):round(((j + 1) * width / sudoku_mode))]
+
+            square = cv2.resize(region_of_interest, (160, 160))
+
+            gray_scaled = cv2.cvtColor(square, cv2.COLOR_BGR2GRAY)
+            blur = cv2.GaussianBlur(gray_scaled, (3, 3), 0)
+            _, region_of_interest = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+            contours, _ = cv2.findContours(region_of_interest , cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            cv2.drawContours(square,contours, -1, (0, 255, 0), 3)
+
+            largest_contour = max(contours, key=cv2.contourArea)
+
+            # cv2.imshow('largest contour',square)
+            # cv2.waitKey(0)
+            # cv2.destroyAllWindows()
+
+            x, y, w, h = cv2.boundingRect(largest_contour)
+
+            to_model  = region_of_interest[y:y + h, x:x + w]
+
+            # cropped= cv2.morphologyEx(region_of_interest, cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8))
+            # return square
+            # cv2.imwrite(f'to_model{i}{j}.png',to_model)
+            number = extract_digit(to_model, i, j, sudokunet)
             row.append(0 if number is None else number)
         puzzle.append(row)
+
+    # for i in range(sudoku_mode):
+    #     row = []
+    #     for j in range(sudoku_mode):
+    #         y1 = i * square_height
+    #         y2 = (i + 1) * square_height
+    #         x1 = j * square_width
+    #         x2 = (j + 1) * square_width
+    #         square_part = image[y1:y2, x1:x2]
+    #         cv2.imshow('largest contour',square_part)
+    #         cv2.waitKey(0)
+    #         s = extract_digit(square_part, i, j, sudokunet)
+    #         number = s
+    #         row.append(0 if number is None else number)
+    #     puzzle.append(row)
 
     with open(extracted_puzzle, "w") as file:
         for row in puzzle:

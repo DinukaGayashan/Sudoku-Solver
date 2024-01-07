@@ -34,7 +34,7 @@ class SudokuNet:
         self.depth: int = depth
         self.classes: int = classes
         self.model_name: str = name
-        self.model_path: str = os.path.join("files/model/")  # add the required path
+        self.model_path: str = os.path.join("files\digit_model.h5")  # add the required path
         self.model = None
 
     def predict(self, digit):

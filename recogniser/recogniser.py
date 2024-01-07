@@ -233,7 +233,7 @@ def extract_digit(img, rect, size):
 
     # Ignore any small bounding boxes
     if w > 0 and h > 0 and (w * h) > 100 and len(digit) > 0:
-        return scale_and_centre(digit, size, 4)  # edit here
+        return scale_and_centre(digit, size, 10)  # edit here
     else:
         return np.zeros((size, size), np.uint8)
 
@@ -286,8 +286,8 @@ def save_warped_image(image, path):
     cv2.imwrite(path, resized_image)
 
 
-def image_processing(original_image, save_image):
-    puzzle_size = 9
+def image_processing(original_image, save_image,puzzle_size):
+    # puzzle_size = 9
     processed_image = process_image(original_image, puzzle_size)
     save_warped_image(processed_image, save_image)
 
