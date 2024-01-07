@@ -28,14 +28,15 @@ if __name__ == "__main__":
         with st.spinner("Please wait while puzzle is solving."):
             original_image = os.path.join("files", "sudoku.jpg")
             processed_image = os.path.join("files", "puzzle.jpg")
+            image_to_model = os.path.join("files", "to_model.jpg")
             extracted_puzzle = os.path.join("files", "puzzle.txt")
             solved_puzzle = os.path.join("files", "puzzle_output.txt")
             size_file = os.path.join("files", "puzzle_size")
             solver_name = os.path.join("solver", "sudoku_solver")
 
             utility.extract_sudoku(file, original_image,
-                                   processed_image,size_file)
-            utility.get_puzzle(processed_image, extracted_puzzle, size_file)
+                                   processed_image,image_to_model,size_file)
+            utility.get_puzzle(image_to_model, extracted_puzzle, size_file)
             if utility.is_valid_sudoku(extracted_puzzle):
                 input_file = os.path.abspath(extracted_puzzle)
                 if utility.run_solver(solver_name, input_file):

@@ -289,7 +289,8 @@ def save_warped_image(image, path):
 def image_processing(original_image, save_image,puzzle_size):
     # puzzle_size = 9
     processed_image = process_image(original_image, puzzle_size)
-    save_warped_image(processed_image, save_image)
+    if puzzle_size==9:
+        save_warped_image(processed_image, save_image)
 
 
 if __name__ == '__main__':

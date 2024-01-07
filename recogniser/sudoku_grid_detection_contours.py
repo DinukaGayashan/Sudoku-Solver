@@ -36,13 +36,28 @@ def read_sudoku_grid(result,sudoku_mode,matrix):
             #send to model
 
 
+def add_pading(image):
+    padding_top = 10
+    padding_bottom = 10
+    padding_left = 10
+    padding_right = 10
 
-def find_sudoku_grid(original_image):
+    border_type = cv2.BORDER_CONSTANT
+    padding_color = (255, 255, 255)
+
+    image = cv2.copyMakeBorder(
+        image, padding_top, padding_bottom, padding_left, padding_right, border_type, value=padding_color
+    )
+    return image
+
+def find_sudoku_grid(original_image,image_to_model,processed_image):
 
     sudoku_area=[1/81,1/256]
     puzzle_corners=[]
 
     image = cv2.imread(original_image)
+    image=add_pading(image)
+    # cv2.imwrite(f'x.png',image)
     original_image = image.copy()
 
     gray = cv2.cvtColor(original_image, cv2.COLOR_BGR2GRAY)
@@ -123,11 +138,36 @@ def find_sudoku_grid(original_image):
     elif area_proportion>256:
         sudoku_mode=16
 
+    save_warped_image(warped_image,processed_image)
+    # cv2.imwrite(processed_image, warped_image)
+    if sudoku_mode==16:
+        save_warped_image(warped_image,image_to_model)
     return sudoku_mode
     # print('sudoku mode',sudoku_mode)
 
 
+def save_warped_image(image, path):
+    height, width,_ = image.shape
+    square_size = max(height, width)
+    square_image = np.zeros((square_size, square_size, 3), dtype=np.uint8)
 
+    scale_x = square_size / width
+    scale_y = square_size / height
+
+    stretched_image = cv2.resize(image, (0, 0), fx=scale_x, fy=scale_y)
+
+    x_offset = (square_size - stretched_image.shape[1]) // 2
+    y_offset = (square_size - stretched_image.shape[0]) // 2
+
+    # stretched_image = cv2.cvtColor(stretched_image, cv2.COLOR_GRAY2BGR)
+
+    square_image[
+        y_offset: y_offset + stretched_image.shape[0],
+        x_offset: x_offset + stretched_image.shape[1],
+    ] = stretched_image
+    resized_image = cv2.resize(square_image, (960, 960))
+
+    cv2.imwrite(path, resized_image)
     # matrix = [[0 for _ in range(sudoku_mode)] for _ in range(sudoku_mode)]
 
     # read_sudoku_grid(warped_image,sudoku_mode,matrix)

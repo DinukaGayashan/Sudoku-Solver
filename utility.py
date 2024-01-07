@@ -8,6 +8,7 @@ import pytesseract
 from keras.preprocessing.image import img_to_array
 from skimage.segmentation import clear_border
 # from keras.models import load_model
+from google.cloud import vision
 
 from recogniser.cnn import SudokuNet
 from recogniser.recogniser import image_processing
@@ -15,27 +16,56 @@ from recogniser.sudoku_grid_detection_contours import find_sudoku_grid
 
 # classifier=load_model("files\digit_model.h5")
 
-# def add_pading(image):
-#     top_pad = 10
-#     bottom_pad = 10
-#     left_pad = 10
-#     right_pad = 10
-#     return cv2.copyMakeBorder(image, top_pad, bottom_pad, left_pad, right_pad, cv2.BORDER_CONSTANT, value=(0, 0, 0))
 
 
 
-def extract_sudoku(file, original_image, processed_image,size_file):
+
+
+def extract_sudoku(file, original_image, processed_image,image_to_model,size_file):
     with open(original_image, "wb") as f:
         f.write(file.getbuffer())
-    size=find_sudoku_grid(original_image)
+    size=find_sudoku_grid(original_image,image_to_model,processed_image)
     with open(size_file, "w") as file:
         file.write(str(size))
     
-    image_processing(original_image, processed_image,size)
+    image_processing(original_image, image_to_model,size)
     # find_sudoku_grid(image)
 
 
-pred_count = 0
+
+
+def detect_text(image):
+    prediction = 0
+    client = vision.ImageAnnotatorClient()
+
+    _, processed_image_data = cv2.imencode('.png', np.array(image, dtype=np.uint8))
+    content = processed_image_data.tobytes()
+    
+    # with open(image, "rb") as image_file:
+    #     content = image_file.read()
+
+
+    image = vision.Image(content=content)
+    response = client.text_detection(image=image)
+
+    if response.error.message:
+        raise Exception(
+            "{}\nFor more info on error messages, check: ".format(response.error.message)
+        )
+
+    texts = response.text_annotations
+    # print(f"[GOOGLE_VISION]: {texts=}")
+    size=len(texts)
+    assert size == 1 or size == 2
+    if size:
+        prediction = int(texts[0].description.strip())
+    
+    return prediction
+
+
+
+
+# pred_count = 0
 
 
 def apply_raw_cell(cell):
@@ -47,89 +77,124 @@ def apply_raw_cell(cell):
     return img
 
 
-def extract_digit(cell, i, j, sudokunet):
-    # cell = cv2.cvtColor(cell, cv2.COLOR_BGR2GRAY)
+def extract_digit(sudoku_mode,cell, i, j, sudokunet):
     img = apply_raw_cell(cell)
-    thresh = cv2.threshold(
+
+    if sudoku_mode==9:
+        thresh = cv2.threshold(
         cell, 0, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)[1]
-    thresh = clear_border(thresh)
-    # cv2.imwrite(f'to_model{i}{j}.png',img)
-    cnts = cv2.findContours(cell, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    cnts = imutils.grab_contours(cnts)
+        thresh = clear_border(thresh)
+        # cv2.imwrite(f'to_model{i}{j}.png',img)
+        cnts = cv2.findContours(cell, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        cnts = imutils.grab_contours(cnts)
 
-    if len(cnts) == 0:
-        return 0
+        if len(cnts) == 0:
+            return 0
 
-    c = max(cnts, key=cv2.contourArea)
-    mask = np.zeros(cell.shape, dtype="uint8")
-    cv2.drawContours(mask, [c], -1, 255, -1)
+        c = max(cnts, key=cv2.contourArea)
+        mask = np.zeros(cell.shape, dtype="uint8")
+        cv2.drawContours(mask, [c], -1, 255, -1)
 
-    (h, w) = cell.shape
-    percentFilled = cv2.countNonZero(mask) / float(w * h)
-    if percentFilled < 0.03:
-        return 0
+        (h, w) = cell.shape
+        percentFilled = cv2.countNonZero(mask) / float(w * h)
+        if percentFilled < 0.03:
+            return 0
 
-    digit = cv2.bitwise_and(cell, cell, mask=mask)
+        digit = cv2.bitwise_and(cell, cell, mask=mask)
 
-    # Create a mask to select the region without the outer pixels
+        # Create a mask to select the region without the outer pixels
 
-    padding_top = 4
-    padding_bottom = 4
-    padding_left = 4
-    padding_right = 4
+        padding_top = 4
+        padding_bottom = 4
+        padding_left = 4
+        padding_right = 4
 
-    border_type = cv2.BORDER_CONSTANT
-    padding_color = (0, 0, 0)
+        border_type = cv2.BORDER_CONSTANT
+        padding_color = (0, 0, 0)
 
-    digit = cv2.copyMakeBorder(
-        digit, padding_top, padding_bottom, padding_left, padding_right, border_type, value=padding_color
-    )
-
-    mask = np.ones_like(digit)
-    thicknes = 12
-    mask[thicknes:-thicknes, thicknes:-thicknes] = 0
-
-    # Set the outer pixels to black
-    digit[mask.astype(bool)] = 0
-
-    roi = cv2.resize(digit, (28, 28))
-
-    try:
-        tess_pred = int(
-            pytesseract.image_to_string(
-                digit, config="--psm 10 --oem 3 -c tessedit_char_whitelist=0123456789 outputbase digits"
-            ).strip()
+        digit = cv2.copyMakeBorder(
+            digit, padding_top, padding_bottom, padding_left, padding_right, border_type, value=padding_color
         )
-        print(tess_pred)
-    except Exception as e:
-        tess_pred = 0
 
-    # cv2.imwrite(f"test{i}{j}.png", roi)
-    roi = img_to_array(roi)
-    roi = np.expand_dims(roi, axis=0)
-    pred, confident = sudokunet.predict_(roi)
-    # predictions = classifier.predict(roi)
-    # predicted_classes = np.argmax(predictions, axis=1)
+        mask = np.ones_like(digit)
+        thicknes = 12
+        mask[thicknes:-thicknes, thicknes:-thicknes] = 0
 
-    # print(predicted_classes)
-    # return predicted_classes[0]
-    global pred_count
-    pred_count += 1
+        # Set the outer pixels to black
+        digit[mask.astype(bool)] = 0
 
-    if confident * 100 < 60:
-        pred = tess_pred
-        if pred < 1 or pred > 9:
-            roi2 = cv2.resize(img, (28, 28))
-            roi2 = img_to_array(roi2)
-            roi2 = np.expand_dims(roi2, axis=0)
-            pred2, confident2 = sudokunet.predict_(roi2)
-            if confident2 * 100 > 60:
-                pred = pred2
-            else:
-                pred = 0
+        roi = cv2.resize(digit, (28, 28))
 
-    print(f"[{i}][{j}] = {pred} - {confident}%")
-    print(pred_count)
+        try:
+            tess_pred = int(
+                pytesseract.image_to_string(
+                    digit, config="--psm 10 --oem 3 -c tessedit_char_whitelist=0123456789 outputbase digits"
+                ).strip()
+            )
+            print(tess_pred)
+        except Exception as e:
+            tess_pred = 0
+
+        # cv2.imwrite(f"test{i}{j}.png", roi)
+        roi = img_to_array(roi)
+        roi = np.expand_dims(roi, axis=0)
+        pred, confident = sudokunet.predict_(roi)
+        # predictions = classifier.predict(roi)
+        # predicted_classes = np.argmax(predictions, axis=1)
+
+        # print(predicted_classes)
+        # return predicted_classes[0]
+        # global pred_count
+        # pred_count += 1
+
+        if confident * 100 < 60:
+            pred = tess_pred
+            if pred < 1 or pred > 9:
+                roi2 = cv2.resize(img, (28, 28))
+                roi2 = img_to_array(roi2)
+                roi2 = np.expand_dims(roi2, axis=0)
+                pred2, confident2 = sudokunet.predict_(roi2)
+                if confident2 * 100 > 60:
+                    pred = pred2
+                else:
+                    pred = 0
+
+        # print(f"[{i}][{j}] = {pred} - {confident}%")
+        # print(pred_count)
+    
+    else:
+        try:
+            tess_pred = int(
+                    pytesseract.image_to_string(
+                        img, config="--psm 10 --oem 3 -c tessedit_char_whitelist=0123456789 outputbase digits"
+                    ).strip()
+                )
+        except:
+            tess_pred=0
+        cell=cv2.bitwise_not(cell)
+        thresh = cv2.threshold(
+        cell, 0, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)[1]
+        thresh = clear_border(thresh)
+        # cv2.imwrite(f'to_model{i}{j}.png',img)
+        cnts = cv2.findContours(cell, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        cnts = imutils.grab_contours(cnts)
+
+        if len(cnts) == 0:
+            return 0
+
+        c = max(cnts, key=cv2.contourArea)
+        mask = np.zeros(cell.shape, dtype="uint8")
+        cv2.drawContours(mask, [c], -1, 255, -1)
+
+        (h, w) = cell.shape
+        percentFilled = cv2.countNonZero(mask) / float(w * h)
+        if percentFilled < 0.03:
+            return 0
+        
+        # cv2.imwrite(f'to_model{i}{j}.png',img)
+        pred=detect_text(img)
+        print(f"[{i}][{j}] = {pred} - {tess_pred}%")
+
     return pred
 
 
@@ -141,9 +206,9 @@ def get_puzzle(filename, extracted_puzzle, size_file):
     # num_rows = puzzle_size
     # num_cols = puzzle_size
     
-    height, width = image.shape[:2]
-    square_height = height // sudoku_mode
-    square_width = width // sudoku_mode
+    # height, width = image.shape[:2]
+    # square_height = height // sudoku_mode
+    # square_width = width // sudoku_mode
 
     puzzle = []
 
@@ -180,7 +245,7 @@ def get_puzzle(filename, extracted_puzzle, size_file):
             # cropped= cv2.morphologyEx(region_of_interest, cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8))
             # return square
             # cv2.imwrite(f'to_model{i}{j}.png',to_model)
-            number = extract_digit(to_model, i, j, sudokunet)
+            number = extract_digit(sudoku_mode,to_model, i, j, sudokunet)
             row.append(0 if number is None else number)
         puzzle.append(row)
 
@@ -246,7 +311,7 @@ def get_solved_image(image, original_puzzle, solved_puzzle):
     image = cv2.imread(image)
 
     font = cv2.FONT_HERSHEY_DUPLEX
-    font_scale = 2
+    font_scale = 2 if sudoku_length==9 else 1
     font_thickness = 2
     font_color = (100, 180, 100)
     line_type = cv2.LINE_AA
