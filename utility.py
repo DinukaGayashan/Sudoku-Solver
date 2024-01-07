@@ -172,6 +172,7 @@ def extract_digit(sudoku_mode,cell, i, j, sudokunet):
         except:
             tess_pred=0
         cell=cv2.bitwise_not(cell)
+
         thresh = cv2.threshold(
         cell, 0, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)[1]
         thresh = clear_border(thresh)
@@ -191,9 +192,38 @@ def extract_digit(sudoku_mode,cell, i, j, sudokunet):
         if percentFilled < 0.03:
             return 0
         
+        digit = cv2.bitwise_and(cell, cell, mask=mask)
+
+        # Create a mask to select the region without the outer pixels
+
+        padding_top = 4
+        padding_bottom = 4
+        padding_left = 4
+        padding_right = 4
+
+        border_type = cv2.BORDER_CONSTANT
+        padding_color = (0, 0, 0)
+
+        digit = cv2.copyMakeBorder(
+            digit, padding_top, padding_bottom, padding_left, padding_right, border_type, value=padding_color
+        )
+
+        mask = np.ones_like(digit)
+        thicknes = 12
+        mask[thicknes:-thicknes, thicknes:-thicknes] = 0
+
+        # Set the outer pixels to black
+        digit[mask.astype(bool)] = 0
+
+        roi = cv2.resize(digit, (28, 28))
+        roi = img_to_array(roi)
+        roi = np.expand_dims(roi, axis=0)
+        pred2, confident2 = sudokunet.predict_(roi)
+        
         # cv2.imwrite(f'to_model{i}{j}.png',img)
         pred=detect_text(img)
-        print(f"[{i}][{j}] = {pred} - {tess_pred}%")
+        if pred < 10:
+            print(f"[{i}][{j}] = {pred} - {tess_pred} - {pred2}")
 
     return pred
 
