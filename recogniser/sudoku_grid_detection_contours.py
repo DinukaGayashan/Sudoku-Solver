@@ -3,9 +3,7 @@ import numpy as np
 
 
 def read_sudoku_grid(result,sudoku_mode,matrix):
-
-    print('selected mode:',sudoku_mode)
-
+    # size=400
     for i in range(sudoku_mode):
         for j in range(sudoku_mode):
 
@@ -21,13 +19,19 @@ def read_sudoku_grid(result,sudoku_mode,matrix):
             blur = cv2.GaussianBlur(gray_scaled, (3, 3), 0)
             _, region_of_interest = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
             contours, _ = cv2.findContours(region_of_interest , cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            cv2.drawContours(square,contours, -1, (0, 255, 0), 3)
 
             largest_contour = max(contours, key=cv2.contourArea)
-            cv2.drawContours(result, largest_contour, -1, (0, 255, 0), 3)
+
+            cv2.imshow('largest contour',square)
+            cv2.waitKey(0)
+            cv2.destroyAllWindows()
 
             x, y, w, h = cv2.boundingRect(largest_contour)
 
             to_model  = region_of_interest[y:y + h, x:x + w]
+
+            cropped= cv2.morphologyEx(region_of_interest, cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8))
 
             #send to model
 
@@ -43,6 +47,7 @@ def find_sudoku_grid(image_path):
 
     gray = cv2.cvtColor(original_image, cv2.COLOR_BGR2GRAY)
     blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+    # thershed =cv2.morphologyEx(blurred, cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8))
     edges = cv2.Canny(blurred, 50, 150, apertureSize=3)
 
     
@@ -55,7 +60,6 @@ def find_sudoku_grid(image_path):
 
     if len(approx)>=4:
         sorted_points = sorted(approx, key=lambda x: x[0][1])
-        print('sorted points: ',sorted_points)
 
         if len(puzzle_corners) < 4:
             puzzle_corners.extend([None] * (4 - len(puzzle_corners)))
@@ -82,62 +86,48 @@ def find_sudoku_grid(image_path):
                                                         [ image_width, image_height]]))
     
     warped_image = cv2.warpPerspective( original_image, homography_matrix, (image_width, image_height))
+    warped_image = cv2.resize(warped_image, (400, 400))
     warped_gray = cv2.cvtColor(warped_image, cv2.COLOR_BGR2GRAY)
     warped_blur= cv2.GaussianBlur(warped_gray, (3, 3), 0)
     warped_otsued = cv2.threshold(warped_blur, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
     warped_eroded = cv2.erode(warped_otsued, np.ones((3, 3), np.uint8), iterations=1)
     warped_edges = cv2.Canny(warped_eroded, 50, 150, apertureSize=3)
 
-    cv2.imshow('canny',warped_edges)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
-
     warped_contours, _ = cv2.findContours(warped_edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    cv2.drawContours(warped_image, warped_contours, -1, (0, 255, 0), 3)
 
-    minimum_Area =  original_image.shape[0] *  original_image.shape[1]
-    
-    min_area_contour=None
+    minimum_area =  400*400
+    area=minimum_area
+
     for contour in warped_contours:
         epsilon = 0.02 * cv2.arcLength(contour, True)
         approx = cv2.approxPolyDP(contour, epsilon, True)
+        cell_area=cv2.contourArea(approx)
 
-        if len(approx) == 4:
-            area = cv2.contourArea(approx)
-            if area < minimum_Area:
-                minimum_Area = area
-                min_area_contour=contour
 
-    print('minimum area cotour:',min_area_contour)   
-    cv2.drawContours(warped_image, min_area_contour, -1, (0,0,255), 5)
+        if len(approx) == 4 and area//500 < cell_area< area:
+            if cell_area>0 and cell_area<minimum_area:
+                minimum_area = cell_area
 
-    cv2.imshow('min contour',warped_image)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
 
-    minArea_precentage = minimum_Area / ( original_image.shape[0] *  original_image.shape[1])
+    #set the default mode=9
+    sudoku_mode=9
 
-    print('minArea_precentage',minArea_precentage)
-    
-    if abs(minArea_precentage - sudoku_area[0]) < abs(minArea_precentage - sudoku_area[1]):
-        sudoku_mode = 9
-    else:
-        sudoku_mode = 16
+    area_proportion=area//minimum_area
+
+    if area_proportion in range(6,12):
+        sudoku_mode=9
+    elif area_proportion in range(12,20):
+        sudoku_mode=16
+    elif area_proportion in range(80,256):
+        sudoku_mode=9
+    elif area_proportion>256:
+        sudoku_mode=16
 
     print('sudoku mode',sudoku_mode)
 
     matrix = [[0 for _ in range(sudoku_mode)] for _ in range(sudoku_mode)]
 
     read_sudoku_grid(warped_image,sudoku_mode,matrix)
-
-
-
-   
-
-
-
-
-
 
 
 find_sudoku_grid('sudoku.jpg')
