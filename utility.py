@@ -222,8 +222,9 @@ def extract_digit(sudoku_mode,cell, i, j, sudokunet):
         
         # cv2.imwrite(f'to_model{i}{j}.png',img)
         pred=detect_text(img)
-        if pred < 10:
+        if pred ==6 or pred==9:
             print(f"[{i}][{j}] = {pred} - {tess_pred} - {pred2}")
+            pred=pred2
 
     return pred
 
