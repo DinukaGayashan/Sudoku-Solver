@@ -1,5 +1,6 @@
 import os
 import subprocess
+import multiprocessing
 
 import cv2
 import imutils
@@ -241,7 +242,7 @@ def get_puzzle(filename, extracted_puzzle, size_file):
     # square_height = height // sudoku_mode
     # square_width = width // sudoku_mode
 
-    puzzle = []
+    multi_process_puzzle = []
 
     sudokunet = SudokuNet()
 
@@ -273,12 +274,23 @@ def get_puzzle(filename, extracted_puzzle, size_file):
 
             to_model  = region_of_interest[y:y + h, x:x + w]
 
+            multi_process_puzzle.append((to_model, i, j, sudokunet))
+
+    with multiprocessing.Pool() as pool:
+        results = pool.map(extract_digit, multi_process_puzzle)
+    
+    
+    puzzle = [] = [results[i:i+sudoku_mode] for i in range(0, len(results), sudoku_mode)]
+  
+
             # cropped= cv2.morphologyEx(region_of_interest, cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8))
             # return square
             # cv2.imwrite(f'to_model{i}{j}.png',to_model)
-            number = extract_digit(sudoku_mode,to_model, i, j, sudokunet)
-            row.append(0 if number is None else number)
-        puzzle.append(row)
+            # number = extract_digit(sudoku_mode,to_model, i, j, sudokunet)
+            # row.append(0 if number is None else number)
+        # puzzle.append(row)
+
+
 
     # for i in range(sudoku_mode):
     #     row = []
