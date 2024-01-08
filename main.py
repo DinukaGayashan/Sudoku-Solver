@@ -37,8 +37,7 @@ if __name__ == "__main__":
             )
             utility.get_puzzle(image_to_model, extracted_puzzle, size_file)
             if utility.is_valid_sudoku(extracted_puzzle):
-                input_file = os.path.abspath(extracted_puzzle)
-                if utility.run_solver(solver_name, input_file):
+                if utility.run_solver(solver_name, extracted_puzzle):
                     solved_image = utility.get_solved_image(
                         processed_image, extracted_puzzle, solved_puzzle
                     )
@@ -46,4 +45,4 @@ if __name__ == "__main__":
                 else:
                     st.error("Issue in solving Sudoku.")
             else:
-                st.error("Sudoku is invaid. Try again.")
+                st.error("Sudoku is invaid.")

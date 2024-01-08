@@ -5,27 +5,28 @@ import subprocess
 import cv2
 import imutils
 import numpy as np
-import pytesseract
 from google.cloud import vision
 from keras.preprocessing.image import img_to_array
 from skimage.segmentation import clear_border
 from tensorflow.keras.models import load_model
 
-from recogniser.recogniser import image_processing
-from recogniser.sudoku_grid_detection_contours import find_sudoku_grid
+from recogniser.sudoku_grid_detection import find_sudoku_grid
+from recogniser.sudoku_grid_processor import process_image
 
-sudokunet = load_model("files\digit_model.h5")
+model_path = os.path.join("files", "digit_model.h5")
+sudokunet = load_model(model_path)
 
 
 def extract_sudoku(file, original_image, processed_image, image_to_model, size_file):
     with open(original_image, "wb") as f:
         f.write(file.getbuffer())
+
     size = find_sudoku_grid(original_image, image_to_model, processed_image)
     with open(size_file, "w") as file:
         file.write(str(size))
 
-    image_processing(original_image, image_to_model, size)
-    # find_sudoku_grid(image)
+    if size == 9:
+        process_image(original_image, image_to_model, processed_image, size)
 
 
 def detect_text(image):
@@ -34,31 +35,19 @@ def detect_text(image):
 
     _, processed_image_data = cv2.imencode(".png", np.array(image, dtype=np.uint8))
     content = processed_image_data.tobytes()
-
-    # with open(image, "rb") as image_file:
-    #     content = image_file.read()
-
     image = vision.Image(content=content)
     response = client.text_detection(image=image)
 
     if response.error.message:
-        raise Exception(
-            "{}\nFor more info on error messages, check: ".format(
-                response.error.message
-            )
-        )
+        raise Exception(str(format(response.error.message)))
 
     texts = response.text_annotations
-    # print(f"[GOOGLE_VISION]: {texts=}")
     size = len(texts)
     assert size == 1 or size == 2
     if size:
         prediction = int(texts[0].description.strip())
 
     return prediction
-
-
-# pred_count = 0
 
 
 def apply_raw_cell(cell):
@@ -76,7 +65,6 @@ def extract_digit(sudoku_mode, cell):
     if sudoku_mode == 9:
         thresh = cv2.threshold(cell, 0, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)[1]
         thresh = clear_border(thresh)
-        # cv2.imwrite(f'to_model{i}{j}.png',img)
         cnts = cv2.findContours(cell, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         cnts = imutils.grab_contours(cnts)
 
@@ -93,23 +81,15 @@ def extract_digit(sudoku_mode, cell):
             return 0
 
         digit = cv2.bitwise_and(cell, cell, mask=mask)
-
-        # Create a mask to select the region without the outer pixels
-
-        padding_top = 4
-        padding_bottom = 4
-        padding_left = 4
-        padding_right = 4
-
+        padding = 4
         border_type = cv2.BORDER_CONSTANT
         padding_color = (0, 0, 0)
-
         digit = cv2.copyMakeBorder(
             digit,
-            padding_top,
-            padding_bottom,
-            padding_left,
-            padding_right,
+            padding,
+            padding,
+            padding,
+            padding,
             border_type,
             value=padding_color,
         )
@@ -117,65 +97,16 @@ def extract_digit(sudoku_mode, cell):
         mask = np.ones_like(digit)
         thicknes = 12
         mask[thicknes:-thicknes, thicknes:-thicknes] = 0
-
-        # Set the outer pixels to black
         digit[mask.astype(bool)] = 0
-
         roi = cv2.resize(digit, (28, 28))
-
-        try:
-            tess_pred = int(
-                pytesseract.image_to_string(
-                    digit,
-                    config="--psm 10 --oem 3 -c tessedit_char_whitelist=0123456789 outputbase digits",
-                ).strip()
-            )
-            print(tess_pred)
-        except Exception as e:
-            tess_pred = 0
-
-        # cv2.imwrite(f"test{i}{j}.png", roi)
         roi = img_to_array(roi)
         roi = np.expand_dims(roi, axis=0)
         pred = sudokunet.predict(roi).argmax(axis=1)[0]
-        # predictions = classifier.predict(roi)
-        # predicted_classes = np.argmax(predictions, axis=1)
-
-        # print(predicted_classes)
-        # return predicted_classes[0]
-        # global pred_count
-        # pred_count += 1
-
-        # if confident * 100 < 60:
-        #     pred = tess_pred
-        #     if pred < 1 or pred > 9:
-        #         roi2 = cv2.resize(img, (28, 28))
-        #         roi2 = img_to_array(roi2)
-        #         roi2 = np.expand_dims(roi2, axis=0)
-        #         pred2 = sudokunet.predict(roi2).argmax(axis=1)[0]
-        #         if confident2 * 100 > 60:
-        #             pred = pred2
-        #         else:
-        #             pred = 0
-
-        # print(f"[{i}][{j}] = {pred} - {confident}%")
-        # print(pred_count)
 
     else:
-        try:
-            tess_pred = int(
-                pytesseract.image_to_string(
-                    img,
-                    config="--psm 10 --oem 3 -c tessedit_char_whitelist=0123456789 outputbase digits",
-                ).strip()
-            )
-        except:
-            tess_pred = 0
         cell = cv2.bitwise_not(cell)
-
         thresh = cv2.threshold(cell, 0, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)[1]
         thresh = clear_border(thresh)
-        # cv2.imwrite(f'to_model{i}{j}.png',img)
         cnts = cv2.findContours(cell, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         cnts = imutils.grab_contours(cnts)
 
@@ -192,23 +123,18 @@ def extract_digit(sudoku_mode, cell):
             return 0
 
         digit = cv2.bitwise_and(cell, cell, mask=mask)
-
-        # Create a mask to select the region without the outer pixels
-
-        padding_top = 4
-        padding_bottom = 4
-        padding_left = 4
-        padding_right = 4
-
+        padding = 4
+        padding = 4
+        padding = 4
+        padding = 4
         border_type = cv2.BORDER_CONSTANT
         padding_color = (0, 0, 0)
-
         digit = cv2.copyMakeBorder(
             digit,
-            padding_top,
-            padding_bottom,
-            padding_left,
-            padding_right,
+            padding,
+            padding,
+            padding,
+            padding,
             border_type,
             value=padding_color,
         )
@@ -216,19 +142,13 @@ def extract_digit(sudoku_mode, cell):
         mask = np.ones_like(digit)
         thicknes = 12
         mask[thicknes:-thicknes, thicknes:-thicknes] = 0
-
-        # Set the outer pixels to black
         digit[mask.astype(bool)] = 0
-
         roi = cv2.resize(digit, (28, 28))
         roi = img_to_array(roi)
         roi = np.expand_dims(roi, axis=0)
         pred2 = sudokunet.predict(roi).argmax(axis=1)[0]
-
-        # cv2.imwrite(f'to_model{i}{j}.png',img)
         pred = detect_text(img)
         if pred == 6 or pred == 9:
-            # print(f"[{i}][{j}] = {pred} - {tess_pred} - {pred2}")
             pred = pred2
 
     return pred
@@ -237,17 +157,9 @@ def extract_digit(sudoku_mode, cell):
 def get_puzzle(filename, extracted_puzzle, size_file):
     with open(size_file, "r") as file:
         sudoku_mode = int(file.readline())
-
     image = cv2.imread(filename)
-    # num_rows = puzzle_size
-    # num_cols = puzzle_size
-
-    # height, width = image.shape[:2]
-    # square_height = height // sudoku_mode
-    # square_width = width // sudoku_mode
 
     multi_process_puzzle = []
-
     for i in range(sudoku_mode):
         row = []
         for j in range(sudoku_mode):
@@ -262,9 +174,7 @@ def get_puzzle(filename, extracted_puzzle, size_file):
                     ((j + 1) * width / sudoku_mode)
                 ),
             ]
-
             square = cv2.resize(region_of_interest, (160, 160))
-
             gray_scaled = cv2.cvtColor(square, cv2.COLOR_BGR2GRAY)
             blur = cv2.GaussianBlur(gray_scaled, (3, 3), 0)
             _, region_of_interest = cv2.threshold(
@@ -276,45 +186,14 @@ def get_puzzle(filename, extracted_puzzle, size_file):
             cv2.drawContours(square, contours, -1, (0, 255, 0), 3)
 
             largest_contour = max(contours, key=cv2.contourArea)
-
-            # cv2.imshow('largest contour',square)
-            # cv2.waitKey(0)
-            # cv2.destroyAllWindows()
-
             x, y, w, h = cv2.boundingRect(largest_contour)
-
             to_model = region_of_interest[y : y + h, x : x + w]
 
             multi_process_puzzle.append((sudoku_mode, to_model))
-    print(multi_process_puzzle)
-    print("multiprocessing start----")
     with multiprocessing.Pool(processes=sudoku_mode) as pool:
         results = pool.starmap(extract_digit, multi_process_puzzle)
 
     puzzle = [results[i : i + sudoku_mode] for i in range(0, len(results), sudoku_mode)]
-
-    # cropped= cv2.morphologyEx(region_of_interest, cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8))
-    # return square
-    # cv2.imwrite(f'to_model{i}{j}.png',to_model)
-    # number = extract_digit(sudoku_mode,to_model, i, j, sudokunet)
-    # row.append(0 if number is None else number)
-    # puzzle.append(row)
-
-    # for i in range(sudoku_mode):
-    #     row = []
-    #     for j in range(sudoku_mode):
-    #         y1 = i * square_height
-    #         y2 = (i + 1) * square_height
-    #         x1 = j * square_width
-    #         x2 = (j + 1) * square_width
-    #         square_part = image[y1:y2, x1:x2]
-    #         cv2.imshow('largest contour',square_part)
-    #         cv2.waitKey(0)
-    #         s = extract_digit(square_part, i, j, sudokunet)
-    #         number = s
-    #         row.append(0 if number is None else number)
-    #     puzzle.append(row)
-
     with open(extracted_puzzle, "w") as file:
         for row in puzzle:
             file.write(" ".join(map(str, row)) + "\n")
@@ -341,55 +220,11 @@ def run_solver(solver_name, input_filename):
     stdout, stderr = process.communicate()
 
     if process.returncode == 0:
-        # print(stdout.decode('utf-8'))
         return True
 
     if stderr:
         print(stderr.decode("utf-8"))
         return False
-
-
-def get_solved_image(image, original_puzzle, solved_puzzle):
-    with open(solved_puzzle, "r") as solved_file, open(
-        original_puzzle, "r"
-    ) as original_file:
-        solved_values = [list(map(int, line.strip().split())) for line in solved_file]
-        original_values = [
-            list(map(int, line.strip().split())) for line in original_file
-        ]
-
-    sudoku_length = len(original_values)
-
-    image = cv2.imread(image)
-
-    font = cv2.FONT_HERSHEY_DUPLEX
-    font_scale = 2 if sudoku_length == 9 else 1
-    font_thickness = 2
-    font_color = (100, 180, 100)
-    line_type = cv2.LINE_AA
-
-    height, _, _ = image.shape
-    cell_size = height // sudoku_length
-
-    for i in range(sudoku_length):
-        for j in range(sudoku_length):
-            if original_values[i][j] == 0:
-                x_pos = j * cell_size + cell_size // 3
-                y_pos = i * cell_size + 2 * cell_size // 3
-
-                cell_value = str(solved_values[i][j])
-                cv2.putText(
-                    image,
-                    cell_value,
-                    (x_pos, y_pos),
-                    font,
-                    font_scale,
-                    font_color,
-                    font_thickness,
-                    line_type,
-                )
-
-    return image
 
 
 def is_valid_sudoku(filename):
@@ -421,3 +256,44 @@ def is_valid_sudoku(filename):
             cols[j].add(curr)
             block[i // sqrt][j // sqrt].add(curr)
     return True
+
+
+def get_solved_image(image, original_puzzle, solved_puzzle):
+    with open(solved_puzzle, "r") as solved_file, open(
+        original_puzzle, "r"
+    ) as original_file:
+        solved_values = [list(map(int, line.strip().split())) for line in solved_file]
+        original_values = [
+            list(map(int, line.strip().split())) for line in original_file
+        ]
+
+    sudoku_length = len(original_values)
+    image = cv2.imread(image)
+
+    font = cv2.FONT_HERSHEY_DUPLEX
+    font_scale = 2 if sudoku_length == 9 else 1
+    font_thickness = 2
+    font_color = (60, 120, 60)
+    line_type = cv2.LINE_AA
+
+    height, _, _ = image.shape
+    cell_size = height // sudoku_length
+
+    for i in range(sudoku_length):
+        for j in range(sudoku_length):
+            if original_values[i][j] == 0:
+                x_pos = j * cell_size + cell_size // 3
+                y_pos = i * cell_size + 2 * cell_size // 3
+
+                cell_value = str(solved_values[i][j])
+                cv2.putText(
+                    image,
+                    cell_value,
+                    (x_pos, y_pos),
+                    font,
+                    font_scale,
+                    font_color,
+                    font_thickness,
+                    line_type,
+                )
+    return image
