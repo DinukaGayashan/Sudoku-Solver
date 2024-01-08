@@ -1,9 +1,9 @@
 google-cloud-vision
 imutils
 opencv-python
-pytesseract
 scikit-image
 scikit-learn
 streamlit
 tensorflow
+keras
 numpy

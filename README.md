@@ -12,7 +12,7 @@ First, the input image taken from the file or camera feed is processed and the i
 
 ## Setup
 
-1. Make sure Python and C++ is installed.
+1. Make sure Python3.10 and g++ is installed.
 2. Clone the repository.
 3. Install requirements.
     ```bash
@@ -23,4 +23,4 @@ First, the input image taken from the file or camera feed is processed and the i
     streamlit run main.py
     ```
 
-Note: For solving Hexadoku puzzles, configure the Gcloud Vision API.
+Note: For solving Hexadoku puzzles, configure the [Google Cloud Vision API](https://cloud.google.com/vision/docs/ocr#vision_text_detection-python).
