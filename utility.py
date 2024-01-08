@@ -31,23 +31,27 @@ def extract_sudoku(file, original_image, processed_image, image_to_model, size_f
 
 def detect_text(image):
     prediction = 0
-    client = vision.ImageAnnotatorClient()
+    try:
+        client = vision.ImageAnnotatorClient()
 
-    _, processed_image_data = cv2.imencode(".png", np.array(image, dtype=np.uint8))
-    content = processed_image_data.tobytes()
-    image = vision.Image(content=content)
-    response = client.text_detection(image=image)
+        _, processed_image_data = cv2.imencode(".png", np.array(image, dtype=np.uint8))
+        content = processed_image_data.tobytes()
+        image = vision.Image(content=content)
+        response = client.text_detection(image=image)
 
-    if response.error.message:
-        raise Exception(str(format(response.error.message)))
+        if response.error.message:
+            raise Exception(str(format(response.error.message)))
 
-    texts = response.text_annotations
-    size = len(texts)
-    assert size == 1 or size == 2
-    if size:
-        prediction = int(texts[0].description.strip())
+        texts = response.text_annotations
+        size = len(texts)
+        if size:
+            prediction = int(texts[0].description.strip())
 
-    return prediction
+        return prediction
+
+    except Exception as e:
+        print(f"Error: {e}")
+        raise Exception(e)
 
 
 def apply_raw_cell(cell):
@@ -59,97 +63,57 @@ def apply_raw_cell(cell):
     return img
 
 
+def get_digit(cell):
+    thresh = cv2.threshold(cell, 0, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)[1]
+    thresh = clear_border(thresh)
+    cnts = cv2.findContours(cell, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    cnts = imutils.grab_contours(cnts)
+
+    if len(cnts) == 0:
+        return 0
+
+    c = max(cnts, key=cv2.contourArea)
+    mask = np.zeros(cell.shape, dtype="uint8")
+    cv2.drawContours(mask, [c], -1, 255, -1)
+
+    (h, w) = cell.shape
+    percent_filled = cv2.countNonZero(mask) / float(w * h)
+    if percent_filled < 0.03:
+        return 0
+
+    digit = cv2.bitwise_and(cell, cell, mask=mask)
+    padding = 4
+    border_type = cv2.BORDER_CONSTANT
+    padding_color = (0, 0, 0)
+    digit = cv2.copyMakeBorder(
+        digit,
+        padding,
+        padding,
+        padding,
+        padding,
+        border_type,
+        value=padding_color,
+    )
+
+    mask = np.ones_like(digit)
+    thicknes = 12
+    mask[thicknes:-thicknes, thicknes:-thicknes] = 0
+    digit[mask.astype(bool)] = 0
+    roi = cv2.resize(digit, (28, 28))
+    roi = img_to_array(roi)
+    roi = np.expand_dims(roi, axis=0)
+    return sudokunet.predict(roi).argmax(axis=1)[0]
+
+
 def extract_digit(sudoku_mode, cell):
-    img = apply_raw_cell(cell)
-
     if sudoku_mode == 9:
-        thresh = cv2.threshold(cell, 0, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)[1]
-        thresh = clear_border(thresh)
-        cnts = cv2.findContours(cell, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        cnts = imutils.grab_contours(cnts)
-
-        if len(cnts) == 0:
-            return 0
-
-        c = max(cnts, key=cv2.contourArea)
-        mask = np.zeros(cell.shape, dtype="uint8")
-        cv2.drawContours(mask, [c], -1, 255, -1)
-
-        (h, w) = cell.shape
-        percentFilled = cv2.countNonZero(mask) / float(w * h)
-        if percentFilled < 0.03:
-            return 0
-
-        digit = cv2.bitwise_and(cell, cell, mask=mask)
-        padding = 4
-        border_type = cv2.BORDER_CONSTANT
-        padding_color = (0, 0, 0)
-        digit = cv2.copyMakeBorder(
-            digit,
-            padding,
-            padding,
-            padding,
-            padding,
-            border_type,
-            value=padding_color,
-        )
-
-        mask = np.ones_like(digit)
-        thicknes = 12
-        mask[thicknes:-thicknes, thicknes:-thicknes] = 0
-        digit[mask.astype(bool)] = 0
-        roi = cv2.resize(digit, (28, 28))
-        roi = img_to_array(roi)
-        roi = np.expand_dims(roi, axis=0)
-        pred = sudokunet.predict(roi).argmax(axis=1)[0]
-
+        pred = get_digit(cell)
     else:
-        cell = cv2.bitwise_not(cell)
-        thresh = cv2.threshold(cell, 0, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)[1]
-        thresh = clear_border(thresh)
-        cnts = cv2.findContours(cell, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        cnts = imutils.grab_contours(cnts)
-
-        if len(cnts) == 0:
-            return 0
-
-        c = max(cnts, key=cv2.contourArea)
-        mask = np.zeros(cell.shape, dtype="uint8")
-        cv2.drawContours(mask, [c], -1, 255, -1)
-
-        (h, w) = cell.shape
-        percentFilled = cv2.countNonZero(mask) / float(w * h)
-        if percentFilled < 0.03:
-            return 0
-
-        digit = cv2.bitwise_and(cell, cell, mask=mask)
-        padding = 4
-        padding = 4
-        padding = 4
-        padding = 4
-        border_type = cv2.BORDER_CONSTANT
-        padding_color = (0, 0, 0)
-        digit = cv2.copyMakeBorder(
-            digit,
-            padding,
-            padding,
-            padding,
-            padding,
-            border_type,
-            value=padding_color,
-        )
-
-        mask = np.ones_like(digit)
-        thicknes = 12
-        mask[thicknes:-thicknes, thicknes:-thicknes] = 0
-        digit[mask.astype(bool)] = 0
-        roi = cv2.resize(digit, (28, 28))
-        roi = img_to_array(roi)
-        roi = np.expand_dims(roi, axis=0)
-        pred2 = sudokunet.predict(roi).argmax(axis=1)[0]
+        img = apply_raw_cell(cell)
         pred = detect_text(img)
         if pred == 6 or pred == 9:
-            pred = pred2
+            cell = cv2.bitwise_not(cell)
+            pred = get_digit(cell)
 
     return pred
 

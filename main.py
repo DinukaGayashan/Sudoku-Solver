@@ -32,6 +32,7 @@ if __name__ == "__main__":
             size_file = os.path.join("files", "puzzle_size")
             solver_name = os.path.join("solver", "sudoku_solver")
 
+            # try:
             utility.extract_sudoku(
                 file, original_image, processed_image, image_to_model, size_file
             )
@@ -46,3 +47,5 @@ if __name__ == "__main__":
                     st.error("Issue in solving Sudoku.")
             else:
                 st.error("Sudoku is invaid.")
+            # except:
+            # st.error("Unable to process.")
